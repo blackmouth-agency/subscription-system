@@ -5,7 +5,7 @@ Orden de ejecución por fases. Cada épica tiene un criterio de aceptación para
 ## Fase 0: Fundamentos
 
 ### E0. Base técnica
-- Proyecto en Supabase, entornos de desarrollo y producción, manejo de secretos y despliegue básico.
+- Proyectos en Supabase y Cloudflare, entornos de desarrollo y producción, pipeline en GitHub Actions, manejo de secretos y despliegue básico.
 - **Aceptación:** se puede desplegar a producción y revertir sin tocar la base de datos.
 
 ## Fase 1: Núcleo (MVP)
