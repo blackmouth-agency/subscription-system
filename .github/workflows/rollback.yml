@@ -1,0 +1,27 @@
+name: Reversión
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Entorno donde revertir
+        required: true
+        type: choice
+        options: [development, production]
+      ref:
+        description: Commit (SHA) o tag a desplegar
+        required: true
+        type: string
+
+concurrency:
+  group: despliegue
+  cancel-in-progress: false
+
+jobs:
+  rollback:
+    uses: ./.github/workflows/deploy-env.yml
+    with:
+      environment: ${{ inputs.environment }}
+      ref: ${{ inputs.ref }}
+      migrate: false
+    secrets: inherit

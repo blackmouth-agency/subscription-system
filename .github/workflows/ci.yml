@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: npm ci
+
+      - name: Lint y tipos de la app
+        run: |
+          npm run lint -w conoce-mas
+          npm run build -w conoce-mas
+
+      - name: Lint y formato de las funciones
+        run: |
+          deno lint --config supabase/functions/deno.json supabase/functions
+          deno fmt --check --config supabase/functions/deno.json supabase/functions
+
+      - name: Levantar Supabase local
+        run: |
+          npx supabase start -x studio,imgproxy,storage-api,realtime,logflare,vector,supavisor,mailpit,postgres-meta
+          npx supabase status -o env > supabase/.env.test
+
+      - name: Pruebas de base de datos
+        run: npx supabase test db
+
+      - name: Pruebas de funciones
+        run: deno test --config supabase/functions/deno.json --allow-net --allow-env --env-file=supabase/.env.test supabase/functions/tests/
+
+      - name: Pruebas end-to-end
+        working-directory: e2e
+        run: |
+          npx playwright install --with-deps chromium
+          npx playwright test

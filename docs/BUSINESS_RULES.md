@@ -4,7 +4,7 @@ Fuente de verdad sobre cómo funciona el producto. No incluye tecnología.
 
 ## 1. Glosario
 
-- **Proyecto:** cada aplicación o landing que se cobra (por ejemplo, Linktree-like, app A, app B). Tiene sus propios planes.
+- **Proyecto:** cada aplicación o landing que se cobra (por ejemplo, conoce-mas, la página de enlaces tipo Linktree; app A; app B). Tiene sus propios planes.
 - **Plan:** oferta de un proyecto con un precio y una periodicidad (mensual o anual).
 - **Suscripción:** relación entre un usuario y un plan. Tiene un estado y fechas de periodo.
 - **Entitlement (derecho de acceso):** permiso concreto de un usuario para usar un proyecto, derivado de su suscripción.
@@ -60,4 +60,4 @@ Transiciones:
 
 - Al crear la cuenta, el usuario acepta los términos y la política de tratamiento de datos.
 - Política de cancelación y reembolsos visible antes del pago.
-- *(Por validar: registro en RNBD, facturación electrónica y registro mercantil, con contador y abogado.)*
+- *(Por validar: registro en RNBD, transferencia internacional de datos personales (la base está en Estados Unidos), facturación electrónica y registro mercantil, con contador y abogado.)*

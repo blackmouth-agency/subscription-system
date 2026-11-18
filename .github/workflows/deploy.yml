@@ -1,0 +1,23 @@
+name: Despliegue
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: despliegue
+  cancel-in-progress: false
+
+jobs:
+  development:
+    uses: ./.github/workflows/deploy-env.yml
+    with:
+      environment: development
+    secrets: inherit
+
+  production:
+    needs: development
+    uses: ./.github/workflows/deploy-env.yml
+    with:
+      environment: production
+    secrets: inherit

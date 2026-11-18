@@ -2,11 +2,14 @@
 
 Orden de ejecución por fases. Cada épica tiene un criterio de aceptación para saber cuándo está terminada.
 
+Cada épica se divide en historias con `/backlog` cuando le toca, y cada historia se refina con `/story` antes de construirla con `/pair`.
+
 ## Fase 0: Fundamentos
 
-### E0. Base técnica
-- Proyectos en Supabase y Cloudflare, entornos de desarrollo y producción, pipeline en GitHub Actions, manejo de secretos y despliegue básico.
+### E0. Stack y walking skeleton
+- El stack definido y la historia más pequeña que funciona de punta a punta: un usuario inicia sesión en una app y ve si tiene acceso. El repositorio, el pipeline, los secretos y el despliegue se construyen dentro de esa historia.
 - **Aceptación:** se puede desplegar a producción y revertir sin tocar la base de datos.
+- **Historias:** `stories/E0.md`.
 
 ## Fase 1: Núcleo (MVP)
 
@@ -65,6 +68,6 @@ Orden de ejecución por fases. Cada épica tiene un criterio de aceptación para
 ## Fase 3: Lanzamiento
 
 ### E11. Piloto y migración
-- Salida a producción con una app y con los promotores actuales como primeros usuarios.
+- Salida a producción con conoce-mas y con los promotores actuales como primeros usuarios. Antes del primer cobro, producción pasa a Supabase Pro.
 - **Depende de:** E1 a E7.
 - **Aceptación:** primeros cobros reales completados sin incidentes.
