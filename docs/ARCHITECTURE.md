@@ -6,14 +6,14 @@ Describe cómo está construido el sistema. Las reglas de negocio están en `BUS
 
 ```
 Landing de marketing (GitHub Pages, estática)
-Apps de cada proyecto (React con Vite)
+Apps de cada proyecto (React con Vite, en Cloudflare)
 Páginas públicas de usuarios (Cloudflare Workers con Hono, con caché)
         │
         ▼
 Supabase
   ├─ Auth: una sola cuenta de usuario para todas las apps
   ├─ Postgres: proyectos, planes, suscripciones, entitlements, pagos, comisiones
-  ├─ Edge Functions (Hono): checkout, webhooks, verificación de acceso
+  ├─ Edge Functions (@supabase/server): checkout, webhooks, verificación de acceso
   ├─ Cron (pg_cron): vencimiento de la gracia, suspensiones y cancelaciones
   └─ RLS: seguridad por fila
         ▲
@@ -34,11 +34,13 @@ Sigue el documento «Stack tecnológico: full stack y DevOps», con una excepci�
 | Capa | Elección |
 |---|---|
 | Base de datos | Supabase Postgres |
+| Región de Supabase | `us-east-1` (Virginia), por latencia desde Colombia |
 | Autenticación | Supabase Auth |
-| Backend | Supabase Edge Functions en TypeScript con Hono; validación con Zod |
+| Backend | Supabase Edge Functions en TypeScript con `withSupabase` de `@supabase/server`, que valida la sesión, da el cliente con RLS y maneja CORS. Hono cuando una función tenga varias rutas. Validación con Zod |
 | Tareas programadas | Supabase Cron (`pg_cron`), que llama a una Edge Function |
 | Páginas públicas | Cloudflare Workers con Hono |
 | Apps | React con Vite y TypeScript; shadcn/ui con Tailwind; TanStack Query; React Hook Form con Zod |
+| Hosting de las apps | Cloudflare |
 | Landing | Sitio estático en GitHub Pages |
 | Pasarela | MercadoPago o ePayco, con suscripciones recurrentes en COP *(por confirmar)* |
 | Correo | Resend o Postmark, también como SMTP de Supabase Auth |
@@ -86,17 +88,17 @@ Las páginas públicas no salen de Edge Functions: Supabase reescribe las respue
 
 **Página pública**
 1. Una petición a `dominio/nombre` llega al Worker de Cloudflare.
-2. El Worker lee `public_pages` con la clave pública de Supabase. RLS solo expone las páginas con `published = true`.
+2. El Worker lee `public_pages` con la clave publishable de Supabase. RLS solo expone las páginas con `published = true`.
 3. Si la página está publicada, la muestra. Si no, muestra "no disponible".
 4. La respuesta queda en la caché de Cloudflare 60 segundos como máximo, así que una página despublicada deja de verse en menos de un minuto aunque falle la purga. Al cambiar `published`, la función que hizo el cambio purga esa URL.
 
 ## 5. Entornos y despliegue
 
 - **Local:** CLI de Supabase (`supabase start`) sobre Docker, y Wrangler para el Worker.
-- **Dos proyectos de Supabase:** desarrollo en el plan Free y producción en el plan Pro (USD 25 al mes). El plan Free pausa el proyecto tras una semana sin actividad, así que no sirve para un sistema que cobra.
+- **Dos proyectos de Supabase:** desarrollo y producción. Durante el desarrollo, los dos viven en una organización en el plan Free. Antes del primer cobro real (E11), producción pasa a una organización propia en el plan Pro (USD 25 al mes), porque el plan Free pausa el proyecto tras una semana sin actividad y no tiene backups automáticos. El plan se cobra por organización, así que desarrollo se queda en la organización Free.
 - **Migraciones:** en SQL dentro del repo (`supabase/migrations`), porque las políticas RLS, los triggers y las tareas de cron se escriben en SQL. Los tipos de TypeScript salen de `supabase gen types`. Drizzle es opcional para las consultas.
-- **GitHub Actions:** en cada PR corren lint, tipos y pruebas. Al fusionar a `main`, aplica las migraciones y despliega las funciones y el Worker.
-- **Revertir:** se despliega la versión anterior de las funciones y del Worker. Las migraciones son compatibles con la versión anterior del código, para poder revertir sin tocar la base. Una migración equivocada se corrige con otra nueva.
+- **GitHub Actions:** en cada PR corren lint, tipos y pruebas. Al fusionar a `main`, aplica las migraciones y despliega las funciones, las apps y el Worker en desarrollo. Producción corre el mismo flujo con aprobación manual.
+- **Revertir:** se despliega la versión anterior de las funciones, las apps y el Worker. Las migraciones son compatibles con la versión anterior del código, para poder revertir sin tocar la base. Una migración equivocada se corrige con otra nueva.
 - **Secretos:** `supabase secrets` para las funciones, secretos de Wrangler para el Worker y secretos de GitHub Actions para el pipeline. Nunca en el repo.
 
 ## 6. Pruebas
@@ -111,7 +113,8 @@ Las páginas públicas no salen de Edge Functions: Supabase reescribe las respue
 
 - Ningún número de tarjeta se guarda en el sistema; solo tokens de la pasarela.
 - El estado de acceso solo lo cambian los webhooks o funciones del servidor, nunca el cliente.
-- La clave `service_role` solo vive en las Edge Functions. Las apps y el Worker usan la clave pública.
+- Solo se usan las claves nuevas de Supabase. Las legacy (`anon` y `service_role`) dejan de funcionar a inicios de 2027.
+- La clave secreta (`sb_secret_…`) solo vive en las Edge Functions, que la reciben de Supabase. Las apps y el Worker usan la clave publishable (`sb_publishable_…`).
 - Las claves secretas viven en variables de entorno del servidor.
 - RLS activado en todas las tablas.
 - Los correos de Auth salen por un SMTP propio (Resend o Postmark): el correo incluido en Supabase es solo para pruebas.
@@ -124,8 +127,7 @@ Las páginas públicas no salen de Edge Functions: Supabase reescribe las respue
 ## 9. Decisiones abiertas
 
 - Pasarela definitiva (MercadoPago o ePayco). Define si la recurrencia la maneja la pasarela o la tarea programada.
-- Dónde se alojan las apps: Cloudflare, junto a las páginas públicas, o Vercel.
-- Dominio de las páginas públicas.
+- Dominio de las páginas públicas. conoce-mas ya publica sus páginas en `conoce-mas.link/<negocio>`, así que esas URLs no pueden romperse cuando E6 las pase al Worker.
 - Si las páginas públicas llevan más contenido que enlaces y textos.
 - Panel de administración: shadcn/ui como las apps, o MUI si las tablas se vuelven densas.
 - Retención de datos (propuesta: 90 días tras suspensión).
