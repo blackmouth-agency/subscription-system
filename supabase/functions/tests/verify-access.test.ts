@@ -80,3 +80,28 @@ Deno.test("rechaza una petición sin sesión", async () => {
 
   assertEquals(response.status, 401);
 });
+
+Deno.test("responde 400 si falta el proyecto", async () => {
+  const user = await signInNewUser("sin-proyecto");
+
+  const response = await fetch(`${functionsUrl}/verify-access`, {
+    headers: { Authorization: `Bearer ${user.accessToken}` },
+  });
+
+  assertEquals(response.status, 400);
+  assertEquals(await response.json(), { error: "Falta el proyecto" });
+});
+
+Deno.test("el mensaje sin acceso nombra el proyecto pedido", async () => {
+  const user = await signInNewUser("otro-proyecto");
+
+  const response = await fetch(
+    `${functionsUrl}/verify-access?project=otra-app`,
+    {
+      headers: { Authorization: `Bearer ${user.accessToken}` },
+    },
+  );
+
+  assertEquals(response.status, 403);
+  assertEquals(await response.json(), { error: "No tienes acceso a otra-app" });
+});

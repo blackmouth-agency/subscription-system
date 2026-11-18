@@ -2,6 +2,11 @@ name: CI
 
 on:
   pull_request:
+  # El despliegue la llama para volver a probar el commit fusionado en main.
+  workflow_call:
+
+permissions:
+  contents: read
 
 jobs:
   test:
@@ -23,8 +28,9 @@ jobs:
           npm run lint -w conoce-mas
           npm run build -w conoce-mas
 
-      - name: Lint y formato de las funciones
+      - name: Lint, formato y tipos de las funciones
         run: |
+          deno check --no-lock --config supabase/functions/verify-access/deno.json supabase/functions/verify-access/index.ts
           deno lint --config supabase/functions/deno.json supabase/functions
           deno fmt --check --config supabase/functions/deno.json supabase/functions
 

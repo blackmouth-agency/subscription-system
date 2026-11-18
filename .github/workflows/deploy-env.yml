@@ -22,13 +22,30 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+    # Un despliegue a la vez por entorno: producción esperando aprobación no frena a desarrollo.
+    concurrency:
+      group: despliegue-${{ inputs.environment }}
+      cancel-in-progress: false
+    # Aquí solo van valores que no son secretos. Cada secreto va únicamente al paso
+    # que lo usa, para que npm ci y los scripts de instalación no lo vean.
     env:
-      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      DEPLOY_ENVIRONMENT: ${{ inputs.environment }}
       SUPABASE_PROJECT_ID: ${{ vars.SUPABASE_PROJECT_ID }}
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
     steps:
+      - name: Revisar las variables del entorno
+        env:
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          for name in SUPABASE_PROJECT_ID VITE_SUPABASE_PUBLISHABLE_KEY CLOUDFLARE_ACCOUNT_ID; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Falta la variable $name en el entorno $DEPLOY_ENVIRONMENT"
+              exit 1
+            fi
+          done
+
       - uses: actions/checkout@v5
         with:
           ref: ${{ inputs.ref }}
@@ -40,16 +57,26 @@ jobs:
 
       - name: Aplicar migraciones
         if: ${{ inputs.migrate }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: npx supabase db push --remote="$SUPABASE_PROJECT_ID" --password "$SUPABASE_DB_PASSWORD" --yes
 
       - name: Desplegar la función
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: npx supabase functions deploy verify-access --remote="$SUPABASE_PROJECT_ID" --yes
 
-      - name: Construir y publicar la app
+      - name: Construir la app
         working-directory: apps/conoce-mas
         env:
           VITE_SUPABASE_URL: https://${{ vars.SUPABASE_PROJECT_ID }}.supabase.co
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
-        run: |
-          npm run build
-          npx wrangler deploy --env "${{ inputs.environment }}"
+        run: npm run build
+
+      - name: Publicar la app
+        working-directory: apps/conoce-mas
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler deploy --env "$DEPLOY_ENVIRONMENT"
