@@ -40,12 +40,10 @@ jobs:
 
       - name: Aplicar migraciones
         if: ${{ inputs.migrate }}
-        run: |
-          npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
-          npx supabase db push
+        run: npx supabase db push --remote="$SUPABASE_PROJECT_ID" --password "$SUPABASE_DB_PASSWORD" --yes
 
       - name: Desplegar la función
-        run: npx supabase functions deploy verify-access --project-ref "$SUPABASE_PROJECT_ID"
+        run: npx supabase functions deploy verify-access --remote="$SUPABASE_PROJECT_ID" --yes
 
       - name: Construir y publicar la app
         working-directory: apps/conoce-mas
