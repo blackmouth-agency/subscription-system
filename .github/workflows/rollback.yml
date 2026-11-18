@@ -9,7 +9,7 @@ on:
         type: choice
         options: [development, production]
       ref:
-        description: Commit (SHA) o tag a desplegar
+        description: Commit (SHA completo, 40 caracteres) o tag a desplegar
         required: true
         type: string
 
