@@ -9,19 +9,50 @@ on:
         type: choice
         options: [development, production]
       ref:
-        description: Commit (SHA completo, 40 caracteres) o tag a desplegar
+        description: Commit (SHA corto o completo) o tag que ya esté en main
         required: true
         type: string
 
-concurrency:
-  group: despliegue
-  cancel-in-progress: false
+permissions:
+  contents: read
 
 jobs:
+  # Solo se vuelve a un commit que ya pasó por main, y se despliega su SHA completo.
+  validate:
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.resolve.outputs.sha }}
+    steps:
+      - name: Exigir que se corra desde main
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::La reversión solo se corre desde main"
+          exit 1
+
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Revisar que el commit esté en main
+        id: resolve
+        env:
+          REF: ${{ inputs.ref }}
+        run: |
+          if ! sha=$(git rev-parse --verify --quiet --end-of-options "$REF^{commit}"); then
+            echo "::error::No existe el commit o tag $REF"
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor "$sha" origin/main; then
+            echo "::error::$REF no está en main"
+            exit 1
+          fi
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
   rollback:
+    needs: validate
     uses: ./.github/workflows/deploy-env.yml
     with:
       environment: ${{ inputs.environment }}
-      ref: ${{ inputs.ref }}
+      ref: ${{ needs.validate.outputs.sha }}
       migrate: false
     secrets: inherit

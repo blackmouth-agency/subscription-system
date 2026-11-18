@@ -2,6 +2,11 @@ name: CI
 
 on:
   pull_request:
+  # El despliegue la llama para volver a probar el commit fusionado en main.
+  workflow_call:
+
+permissions:
+  contents: read
 
 jobs:
   test:

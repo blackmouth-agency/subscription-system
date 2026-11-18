@@ -4,12 +4,16 @@ on:
   push:
     branches: [main]
 
-concurrency:
-  group: despliegue
-  cancel-in-progress: false
+permissions:
+  contents: read
 
 jobs:
+  # Vuelve a probar el commit fusionado: si CI falla, no se despliega nada.
+  ci:
+    uses: ./.github/workflows/ci.yml
+
   development:
+    needs: ci
     uses: ./.github/workflows/deploy-env.yml
     with:
       environment: development
