@@ -104,6 +104,34 @@ function MyProfile({ userId, email }: { userId: string; email: string }) {
   );
 }
 
+// El servidor exige la contraseña actual para aceptar la nueva (require_current_password).
+function ChangePassword() {
+  const [message, setMessage] = useState("");
+
+  async function change(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const { error } = await supabase.auth.updateUser({
+      password: String(form.get("new_password")),
+      current_password: String(form.get("current_password")),
+    });
+    if (error?.code === "current_password_invalid") return setMessage("Tu contraseña actual no es correcta.");
+    if (error?.code === "weak_password") return setMessage("La contraseña debe tener al menos 8 caracteres.");
+    setMessage("Cambiamos tu contraseña.");
+  }
+
+  return (
+    <form method="post" onSubmit={change}>
+      <label htmlFor="current-password">Contraseña actual</label>
+      <input id="current-password" name="current_password" type="password" autoComplete="current-password" />
+      <label htmlFor="next-password">Contraseña nueva</label>
+      <input id="next-password" name="new_password" type="password" autoComplete="new-password" />
+      <button type="submit">Cambiar contraseña</button>
+      <p role="status">{message}</p>
+    </form>
+  );
+}
+
 export default function App() {
   // undefined mientras se averigua si el dispositivo tiene una sesión guardada.
   const [session, setSession] = useState<Session | null | undefined>(undefined);
@@ -222,7 +250,12 @@ export default function App() {
           </button>
         </>
       )}
-      {session && !recovering && showProfile && <MyProfile userId={session.user.id} email={session.user.email!} />}
+      {session && !recovering && showProfile && (
+        <>
+          <MyProfile userId={session.user.id} email={session.user.email!} />
+          <ChangePassword />
+        </>
+      )}
     </main>
   );
 }
