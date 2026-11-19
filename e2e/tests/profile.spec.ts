@@ -154,3 +154,43 @@ test("no puedo cambiar mi contraseña por una de menos de 8 caracteres", async (
   await signOutAndSignIn(page, email, password);
   await expect(page.getByText(`Entraste como ${email}`)).toBeVisible();
 });
+
+// Pide eliminar la cuenta escribiendo ese correo para confirmar.
+async function deleteAccount(page: Page, confirmEmail: string) {
+  await page.getByLabel("Escribe tu email para confirmar").fill(confirmEmail);
+  await page.getByRole("button", { name: "Eliminar mi cuenta" }).click();
+}
+
+test("al eliminar mi cuenta escribiendo mi correo salgo del portal y veo que se eliminó", async ({ page }) => {
+  const email = await createUser("eliminar-cuenta");
+  await openProfile(page, email);
+
+  await deleteAccount(page, email);
+
+  await expect(page.getByText("Eliminamos tu cuenta.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Iniciar sesión" })).toBeVisible();
+});
+
+test("después de eliminar mi cuenta no puedo entrar con ese correo", async ({ page }) => {
+  const email = await createUser("eliminar-y-entrar");
+  await openProfile(page, email);
+  await deleteAccount(page, email);
+  await expect(page.getByText("Eliminamos tu cuenta.")).toBeVisible();
+
+  await page.getByLabel("Correo").fill(email);
+  await page.getByLabel("Contraseña").fill(password);
+  await page.getByRole("button", { name: "Iniciar sesión" }).click();
+
+  await expect(page.getByText("Correo o contraseña incorrectos.")).toBeVisible();
+});
+
+test("si escribo un correo distinto al mío mi cuenta no se elimina", async ({ page }) => {
+  const email = await createUser("eliminar-otro-correo");
+  await openProfile(page, email);
+
+  await deleteAccount(page, `otro-${email}`);
+
+  await expect(page.getByText("El correo no coincide con el tuyo.")).toBeVisible();
+  await signOutAndSignIn(page, email, password);
+  await expect(page.getByText(`Entraste como ${email}`)).toBeVisible();
+});

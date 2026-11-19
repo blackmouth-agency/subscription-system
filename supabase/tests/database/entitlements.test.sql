@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(8);
+select plan(9);
 
 -- Dos usuarios con acceso a un proyecto propio de esta prueba
 insert into auth.users (id, email) values
@@ -14,6 +14,10 @@ insert into public.projects (id, slug) values
 insert into public.entitlements (user_id, project_id) values
   ('11111111-1111-1111-1111-111111111111', '33333333-3333-3333-3333-333333333333'),
   ('22222222-2222-2222-2222-222222222222', '33333333-3333-3333-3333-333333333333');
+
+-- Beto aceptó los términos al registrarse
+insert into public.document_acceptances (user_id, document, version) values
+  ('22222222-2222-2222-2222-222222222222', 'terminos', '2026-11-19');
 
 -- Ana consulta los accesos con su sesión
 set local role authenticated;
@@ -73,6 +77,11 @@ select lives_ok(
 select is_empty(
   $$ select 1 from public.entitlements where user_id = '22222222-2222-2222-2222-222222222222' $$,
   'borrar un usuario borra sus accesos'
+);
+
+select is_empty(
+  $$ select 1 from public.document_acceptances where user_id = '22222222-2222-2222-2222-222222222222' $$,
+  'borrar un usuario borra su constancia de los términos'
 );
 
 select * from finish();

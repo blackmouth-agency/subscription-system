@@ -132,6 +132,32 @@ function ChangePassword() {
   );
 }
 
+// Pedir el correo evita borrar por accidente. Lo que impide borrar una cuenta ajena es la función,
+// que solo borra la de la sesión.
+function DeleteAccount({ email, onDeleted }: { email: string; onDeleted: () => void }) {
+  const [message, setMessage] = useState("");
+
+  async function remove(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    if (form.get("confirm_email") !== email) return setMessage("El correo no coincide con el tuyo.");
+    await supabase.functions.invoke("delete-account");
+    // Solo en este dispositivo: la sesión deja de servir en el servidor al borrar la cuenta.
+    await supabase.auth.signOut({ scope: "local" });
+    onDeleted();
+  }
+
+  return (
+    <form method="post" onSubmit={remove}>
+      <p>Esto borra tu cuenta y tus datos, y no se puede deshacer.</p>
+      <label htmlFor="confirm-email">Escribe tu email para confirmar</label>
+      <input id="confirm-email" name="confirm_email" type="email" autoComplete="off" spellCheck={false} />
+      <button type="submit">Eliminar mi cuenta</button>
+      <p role="status">{message}</p>
+    </form>
+  );
+}
+
 export default function App() {
   // undefined mientras se averigua si el dispositivo tiene una sesión guardada.
   const [session, setSession] = useState<Session | null | undefined>(undefined);
@@ -254,6 +280,7 @@ export default function App() {
         <>
           <MyProfile userId={session.user.id} email={session.user.email!} />
           <ChangePassword />
+          <DeleteAccount email={session.user.email!} onDeleted={() => setMessage("Eliminamos tu cuenta.")} />
         </>
       )}
     </main>
