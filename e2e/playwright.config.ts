@@ -7,7 +7,7 @@ export default defineConfig({
   testDir: "./tests",
   use: { baseURL: "http://localhost:5173" },
   webServer: {
-    command: "npm run dev -w conoce-mas",
+    command: "npm run dev -w portal",
     cwd: path.resolve(__dirname, ".."),
     url: "http://localhost:5173",
     // En CI siempre arranca uno nuevo, apuntando al Supabase de esta corrida.

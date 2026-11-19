@@ -25,8 +25,8 @@ jobs:
 
       - name: Lint y tipos de la app
         run: |
-          npm run lint -w conoce-mas
-          npm run build -w conoce-mas
+          npm run lint -w portal
+          npm run build -w portal
 
       - name: Lint, formato y tipos de las funciones
         run: |
@@ -34,9 +34,10 @@ jobs:
           deno lint --config supabase/functions/deno.json supabase/functions
           deno fmt --check --config supabase/functions/deno.json supabase/functions
 
+      # Mailpit se queda: el registro envía el correo de confirmación y las pruebas E2E lo leen.
       - name: Levantar Supabase local
         run: |
-          npx supabase start -x studio,imgproxy,storage-api,realtime,logflare,vector,supavisor,mailpit,postgres-meta
+          npx supabase start -x studio,imgproxy,storage-api,realtime,logflare,vector,supavisor,postgres-meta
           npx supabase status -o env > supabase/.env.test
 
       - name: Pruebas de base de datos

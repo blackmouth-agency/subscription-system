@@ -5,25 +5,8 @@ const admin = createClient(process.env.API_URL!, process.env.SECRET_KEY!, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
-test("un usuario con acceso inicia sesión y ve el contenido de conoce-mas", async ({ page }) => {
-  const email = `e2e-con-acceso-${crypto.randomUUID()}@test.local`;
-  const password = "clave-de-prueba-123";
-  const { data: created } = await admin.auth.admin.createUser({ email, password, email_confirm: true });
-  const { data: project } = await admin.from("projects")
-    .upsert({ slug: "conoce-mas" }, { onConflict: "slug" })
-    .select().single();
-  await admin.from("entitlements").insert({ user_id: created.user!.id, project_id: project!.id });
-
-  await page.goto("/");
-  await page.getByLabel("Correo").fill(email);
-  await page.getByLabel("Contraseña").fill(password);
-  await page.getByRole("button", { name: "Iniciar sesión" }).click();
-
-  await expect(page.getByText("Bienvenido a conoce-mas")).toBeVisible();
-});
-
-test("un usuario sin acceso inicia sesión y ve que no tiene acceso", async ({ page }) => {
-  const email = `e2e-sin-acceso-${crypto.randomUUID()}@test.local`;
+test("al iniciar sesión veo con qué correo entré", async ({ page }) => {
+  const email = `e2e-inicio-${crypto.randomUUID()}@test.local`;
   const password = "clave-de-prueba-123";
   await admin.auth.admin.createUser({ email, password, email_confirm: true });
 
@@ -32,7 +15,7 @@ test("un usuario sin acceso inicia sesión y ve que no tiene acceso", async ({ p
   await page.getByLabel("Contraseña").fill(password);
   await page.getByRole("button", { name: "Iniciar sesión" }).click();
 
-  await expect(page.getByText("No tienes acceso a conoce-mas")).toBeVisible();
+  await expect(page.getByText(`Entraste como ${email}`)).toBeVisible();
 });
 
 test("con una contraseña equivocada veo que el correo o la contraseña no son correctos", async ({ page }) => {
@@ -47,54 +30,34 @@ test("con una contraseña equivocada veo que el correo o la contraseña no son c
   await expect(page.getByText("Correo o contraseña incorrectos.")).toBeVisible();
 });
 
-test("si la verificación falla veo un mensaje para intentar de nuevo", async ({ page }) => {
-  const email = `e2e-verificacion-falla-${crypto.randomUUID()}@test.local`;
+test("después de entrar puedo probar con otra cuenta", async ({ page }) => {
   const password = "clave-de-prueba-123";
-  await admin.auth.admin.createUser({ email, password, email_confirm: true });
-  await page.route("**/functions/v1/verify-access**", (route) =>
-    route.fulfill({ status: 500, json: { code: "INTERNAL_ERROR", message: "Algo falló" } }),
-  );
+  const primera = `e2e-otra-cuenta-1-${crypto.randomUUID()}@test.local`;
+  const segunda = `e2e-otra-cuenta-2-${crypto.randomUUID()}@test.local`;
+  await admin.auth.admin.createUser({ email: primera, password, email_confirm: true });
+  await admin.auth.admin.createUser({ email: segunda, password, email_confirm: true });
 
   await page.goto("/");
-  await page.getByLabel("Correo").fill(email);
+  await page.getByLabel("Correo").fill(primera);
   await page.getByLabel("Contraseña").fill(password);
   await page.getByRole("button", { name: "Iniciar sesión" }).click();
-
-  await expect(page.getByText("No se pudo verificar tu acceso. Intenta de nuevo.")).toBeVisible();
-});
-
-test("después de ver que no tengo acceso puedo entrar con otra cuenta", async ({ page }) => {
-  const password = "clave-de-prueba-123";
-  const sinAcceso = `e2e-otra-cuenta-sin-${crypto.randomUUID()}@test.local`;
-  const conAcceso = `e2e-otra-cuenta-con-${crypto.randomUUID()}@test.local`;
-  await admin.auth.admin.createUser({ email: sinAcceso, password, email_confirm: true });
-  const { data: created } = await admin.auth.admin.createUser({ email: conAcceso, password, email_confirm: true });
-  const { data: project } = await admin.from("projects")
-    .upsert({ slug: "conoce-mas" }, { onConflict: "slug" })
-    .select().single();
-  await admin.from("entitlements").insert({ user_id: created.user!.id, project_id: project!.id });
-
-  await page.goto("/");
-  await page.getByLabel("Correo").fill(sinAcceso);
-  await page.getByLabel("Contraseña").fill(password);
-  await page.getByRole("button", { name: "Iniciar sesión" }).click();
-  await expect(page.getByText("No tienes acceso a conoce-mas")).toBeVisible();
+  await expect(page.getByText(`Entraste como ${primera}`)).toBeVisible();
 
   await page.getByRole("button", { name: "Probar con otra cuenta" }).click();
-  await page.getByLabel("Correo").fill(conAcceso);
+  await page.getByLabel("Correo").fill(segunda);
   await page.getByLabel("Contraseña").fill(password);
   await page.getByRole("button", { name: "Iniciar sesión" }).click();
 
-  await expect(page.getByText("Bienvenido a conoce-mas")).toBeVisible();
+  await expect(page.getByText(`Entraste como ${segunda}`)).toBeVisible();
 });
 
-test("mientras verifico mi acceso no puedo volver a enviar el formulario", async ({ page }) => {
+test("mientras inicio sesión no puedo volver a enviar el formulario", async ({ page }) => {
   const email = `e2e-doble-envio-${crypto.randomUUID()}@test.local`;
   const password = "clave-de-prueba-123";
   await admin.auth.admin.createUser({ email, password, email_confirm: true });
   let release!: () => void;
   const held = new Promise<void>((resolve) => (release = resolve));
-  await page.route("**/functions/v1/verify-access**", async (route) => {
+  await page.route("**/auth/v1/token**", async (route) => {
     await held;
     await route.continue();
   });
@@ -106,5 +69,68 @@ test("mientras verifico mi acceso no puedo volver a enviar el formulario", async
 
   await expect(page.getByRole("button", { name: "Iniciar sesión" })).toBeDisabled();
   release();
-  await expect(page.getByText("No tienes acceso a conoce-mas")).toBeVisible();
+  await expect(page.getByText(`Entraste como ${email}`)).toBeVisible();
+});
+
+test("al registrarme con mi correo y una contraseña veo que debo revisar mi correo", async ({ page }) => {
+  const email = `e2e-registro-${crypto.randomUUID()}@test.local`;
+
+  await page.goto("/");
+  await page.getByLabel("Correo").fill(email);
+  await page.getByLabel("Contraseña").fill("clave-de-prueba-123");
+  await page.getByRole("button", { name: "Crear cuenta" }).click();
+
+  await expect(page.getByText("Revisa tu correo para confirmar tu cuenta.")).toBeVisible();
+});
+
+test("no puedo registrarme con una contraseña de menos de 8 caracteres", async ({ page }) => {
+  const email = `e2e-clave-corta-${crypto.randomUUID()}@test.local`;
+
+  await page.goto("/");
+  await page.getByLabel("Correo").fill(email);
+  await page.getByLabel("Contraseña").fill("corta12");
+  await page.getByRole("button", { name: "Crear cuenta" }).click();
+
+  await expect(page.getByText("La contraseña debe tener al menos 8 caracteres.")).toBeVisible();
+});
+
+test("si no he confirmado mi correo e intento entrar, veo que primero debo confirmarlo", async ({ page }) => {
+  const email = `e2e-sin-confirmar-${crypto.randomUUID()}@test.local`;
+  const password = "clave-de-prueba-123";
+  await admin.auth.admin.createUser({ email, password, email_confirm: false });
+
+  await page.goto("/");
+  await page.getByLabel("Correo").fill(email);
+  await page.getByLabel("Contraseña").fill(password);
+  await page.getByRole("button", { name: "Iniciar sesión" }).click();
+
+  await expect(page.getByText("Primero debes confirmar tu correo.")).toBeVisible();
+});
+
+async function confirmationLink(email: string): Promise<string> {
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const query = encodeURIComponent(`to:"${email}"`);
+    const { messages } = await (await fetch(`${process.env.MAILPIT_URL}/api/v1/search?query=${query}`)).json();
+    if (messages?.length) {
+      const message = await (await fetch(`${process.env.MAILPIT_URL}/api/v1/message/${messages[0].ID}`)).json();
+      const link = message.Text.match(/https?:\/\/\S+\/auth\/v1\/verify[^\s)]+/)?.[0];
+      if (link) return link;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  throw new Error(`No llegó el correo de confirmación a ${email}`);
+}
+
+test("al abrir el enlace de confirmación entro al portal con mi cuenta", async ({ page }) => {
+  const email = `e2e-confirmar-${crypto.randomUUID()}@test.local`;
+
+  await page.goto("/");
+  await page.getByLabel("Correo").fill(email);
+  await page.getByLabel("Contraseña").fill("clave-de-prueba-123");
+  await page.getByRole("button", { name: "Crear cuenta" }).click();
+  await expect(page.getByText("Revisa tu correo para confirmar tu cuenta.")).toBeVisible();
+
+  await page.goto(await confirmationLink(email));
+
+  await expect(page.getByText(`Entraste como ${email}`)).toBeVisible();
 });
