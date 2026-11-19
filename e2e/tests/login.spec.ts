@@ -1,9 +1,21 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 
 const admin = createClient(process.env.API_URL!, process.env.SECRET_KEY!, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
+
+const acceptDocuments = (page: Page) =>
+  page.getByRole("checkbox", { name: "Acepto los términos y la política de datos" });
+
+// Abre el registro y llena el formulario; cada prueba decide cuándo enviarlo.
+async function fillSignUp(page: Page, email: string, password: string, { accept = true } = {}) {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Crear una cuenta" }).click();
+  await page.getByLabel("Correo").fill(email);
+  await page.getByLabel("Contraseña").fill(password);
+  if (accept) await acceptDocuments(page).check();
+}
 
 test("al iniciar sesión veo con qué correo entré", async ({ page }) => {
   const email = `e2e-inicio-${crypto.randomUUID()}@test.local`;
@@ -75,9 +87,7 @@ test("mientras inicio sesión no puedo volver a enviar el formulario", async ({ 
 test("al registrarme con mi correo y una contraseña veo que debo revisar mi correo", async ({ page }) => {
   const email = `e2e-registro-${crypto.randomUUID()}@test.local`;
 
-  await page.goto("/");
-  await page.getByLabel("Correo").fill(email);
-  await page.getByLabel("Contraseña").fill("clave-de-prueba-123");
+  await fillSignUp(page, email, "clave-de-prueba-123");
   await page.getByRole("button", { name: "Crear cuenta" }).click();
 
   await expect(page.getByText("Revisa tu correo para confirmar tu cuenta.")).toBeVisible();
@@ -86,12 +96,86 @@ test("al registrarme con mi correo y una contraseña veo que debo revisar mi cor
 test("no puedo registrarme con una contraseña de menos de 8 caracteres", async ({ page }) => {
   const email = `e2e-clave-corta-${crypto.randomUUID()}@test.local`;
 
-  await page.goto("/");
-  await page.getByLabel("Correo").fill(email);
-  await page.getByLabel("Contraseña").fill("corta12");
+  await fillSignUp(page, email, "corta12");
   await page.getByRole("button", { name: "Crear cuenta" }).click();
 
   await expect(page.getByText("La contraseña debe tener al menos 8 caracteres.")).toBeVisible();
+});
+
+test("sin aceptar los términos y la política de datos no puedo crear la cuenta", async ({ page }) => {
+  const email = `e2e-sin-aceptar-${crypto.randomUUID()}@test.local`;
+  const password = "clave-de-prueba-123";
+
+  await fillSignUp(page, email, password, { accept: false });
+  await page.getByRole("button", { name: "Crear cuenta" }).click();
+
+  // El portal no envía el registro: lleva a la casilla que falta marcar.
+  await expect(acceptDocuments(page)).toBeFocused();
+  await expect(acceptDocuments(page)).not.toBeChecked();
+
+  // Si la cuenta existiera, al entrar con esos datos pediría confirmar el correo.
+  await page.getByRole("button", { name: "Ya tengo cuenta" }).click();
+  await page.getByLabel("Correo").fill(email);
+  await page.getByLabel("Contraseña").fill(password);
+  await page.getByRole("button", { name: "Iniciar sesión" }).click();
+
+  await expect(page.getByText("Correo o contraseña incorrectos.")).toBeVisible();
+});
+
+test("los enlaces a los términos y a la política de datos llevan al sitio de BlackMouth", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Crear una cuenta" }).click();
+
+  await expect(page.getByRole("link", { name: "términos" })).toHaveAttribute("href", "https://blackmouth.agency/terminos");
+  await expect(page.getByRole("link", { name: "política de datos" })).toHaveAttribute(
+    "href",
+    "https://blackmouth.agency/politica-de-datos",
+  );
+});
+
+test("al abrir los documentos no pierdo lo que escribí en el registro", async ({ page }) => {
+  // Las pruebas no dependen del sitio de BlackMouth: sus páginas se responden aquí.
+  await page.context().route("https://blackmouth.agency/**", (route) => route.fulfill({ body: "Documento" }));
+  const email = `e2e-documentos-${crypto.randomUUID()}@test.local`;
+
+  await fillSignUp(page, email, "clave-de-prueba-123");
+
+  for (const [name, url] of [
+    ["términos", "https://blackmouth.agency/terminos"],
+    ["política de datos", "https://blackmouth.agency/politica-de-datos"],
+  ]) {
+    const opened = page.waitForEvent("popup", { timeout: 5_000 });
+    await page.getByRole("link", { name }).click();
+    await expect(await opened).toHaveURL(url);
+  }
+
+  await expect(page.getByLabel("Correo")).toHaveValue(email);
+});
+
+test("al crear la cuenta aceptando, quedan registradas la fecha y la versión de cada documento", async ({ page }) => {
+  const email = `e2e-aceptacion-${crypto.randomUUID()}@test.local`;
+
+  await fillSignUp(page, email, "clave-de-prueba-123");
+  const signup = page.waitForResponse("**/auth/v1/signup**");
+  await page.getByRole("button", { name: "Crear cuenta" }).click();
+  const { id: userId } = await (await signup).json();
+  await expect(page.getByText("Revisa tu correo para confirmar tu cuenta.")).toBeVisible();
+
+  const { data, error } = await admin
+    .from("document_acceptances")
+    .select("document, version, accepted_at")
+    .eq("user_id", userId)
+    .order("document");
+
+  const { data: current } = await admin.from("legal_documents").select("document, version").order("document");
+
+  expect(error).toBeNull();
+  expect(current!.map(({ document }) => document)).toEqual(["politica-de-datos", "terminos"]);
+  expect(data!.map(({ document, version }) => ({ document, version }))).toEqual(current);
+  // Margen de un minuto: el reloj de la base (Docker) puede ir algo desfasado del de la prueba.
+  for (const { accepted_at } of data!) {
+    expect(Math.abs(Date.parse(accepted_at) - Date.now())).toBeLessThan(60_000);
+  }
 });
 
 test("si no he confirmado mi correo e intento entrar, veo que primero debo confirmarlo", async ({ page }) => {
@@ -124,9 +208,7 @@ async function confirmationLink(email: string): Promise<string> {
 test("al abrir el enlace de confirmación entro al portal con mi cuenta", async ({ page }) => {
   const email = `e2e-confirmar-${crypto.randomUUID()}@test.local`;
 
-  await page.goto("/");
-  await page.getByLabel("Correo").fill(email);
-  await page.getByLabel("Contraseña").fill("clave-de-prueba-123");
+  await fillSignUp(page, email, "clave-de-prueba-123");
   await page.getByRole("button", { name: "Crear cuenta" }).click();
   await expect(page.getByText("Revisa tu correo para confirmar tu cuenta.")).toBeVisible();
 
