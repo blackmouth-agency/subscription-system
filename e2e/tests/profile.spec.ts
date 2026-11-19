@@ -97,3 +97,60 @@ test("con un teléfono que no es celular colombiano no se guarda y veo cómo deb
   await reopenProfile(page);
   await expect(page.getByLabel("Teléfono")).toHaveValue("3001234567");
 });
+
+// Cambia la contraseña desde "Mi perfil".
+async function changePassword(page: Page, current: string, next: string) {
+  await page.getByLabel("Contraseña actual").fill(current);
+  await page.getByLabel("Contraseña nueva").fill(next);
+  await page.getByRole("button", { name: "Cambiar contraseña" }).click();
+}
+
+// Cierra sesión e intenta volver a entrar con esa contraseña.
+async function signOutAndSignIn(page: Page, email: string, withPassword: string) {
+  await page.getByRole("button", { name: "Cerrar sesión" }).click();
+  await expect(page.getByRole("button", { name: "Iniciar sesión" })).toBeVisible();
+  await page.getByLabel("Correo").fill(email);
+  await page.getByLabel("Contraseña").fill(withPassword);
+  await page.getByRole("button", { name: "Iniciar sesión" }).click();
+}
+
+test("al cambiar mi contraseña con la actual y una nueva veo que se cambió y la anterior deja de servir", async ({
+  page,
+}) => {
+  const email = await createUser("clave-cambiar");
+  await openProfile(page, email);
+
+  await changePassword(page, password, "clave-nueva-456");
+
+  await expect(page.getByText("Cambiamos tu contraseña.")).toBeVisible();
+  await signOutAndSignIn(page, email, password);
+  await expect(page.getByText("Correo o contraseña incorrectos.")).toBeVisible();
+  await page.getByLabel("Contraseña").fill("clave-nueva-456");
+  await page.getByRole("button", { name: "Iniciar sesión" }).click();
+  await expect(page.getByText(`Entraste como ${email}`)).toBeVisible();
+});
+
+test("con mi contraseña actual equivocada veo que no es correcta y la contraseña no cambia", async ({ page }) => {
+  const email = await createUser("clave-actual-equivocada");
+  await openProfile(page, email);
+
+  await changePassword(page, "otra-clave-000", "clave-nueva-456");
+
+  await expect(page.getByText("Tu contraseña actual no es correcta.")).toBeVisible();
+  await signOutAndSignIn(page, email, "clave-nueva-456");
+  await expect(page.getByText("Correo o contraseña incorrectos.")).toBeVisible();
+  await page.getByLabel("Contraseña").fill(password);
+  await page.getByRole("button", { name: "Iniciar sesión" }).click();
+  await expect(page.getByText(`Entraste como ${email}`)).toBeVisible();
+});
+
+test("no puedo cambiar mi contraseña por una de menos de 8 caracteres", async ({ page }) => {
+  const email = await createUser("clave-nueva-corta");
+  await openProfile(page, email);
+
+  await changePassword(page, password, "corta12");
+
+  await expect(page.getByText("La contraseña debe tener al menos 8 caracteres.")).toBeVisible();
+  await signOutAndSignIn(page, email, password);
+  await expect(page.getByText(`Entraste como ${email}`)).toBeVisible();
+});
