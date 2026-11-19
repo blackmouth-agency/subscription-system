@@ -62,10 +62,12 @@ jobs:
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: npx supabase db push --remote="$SUPABASE_PROJECT_ID" --password "$SUPABASE_DB_PASSWORD" --yes
 
-      - name: Desplegar la función
+      - name: Desplegar las funciones
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: npx supabase functions deploy verify-access --remote="$SUPABASE_PROJECT_ID" --yes
+        run: |
+          npx supabase functions deploy verify-access --remote="$SUPABASE_PROJECT_ID" --yes
+          npx supabase functions deploy delete-account --remote="$SUPABASE_PROJECT_ID" --yes
 
       - name: Construir la app
         working-directory: apps/portal
