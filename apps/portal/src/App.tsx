@@ -1,36 +1,48 @@
-import { useState, type FormEvent } from "react";
-import { createClient, FunctionsHttpError } from "@supabase/supabase-js";
+import { useEffect, useState, type FormEvent } from "react";
+import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY);
 
-async function verifyAccess(form: FormData): Promise<string> {
-  const { error: signInError } = await supabase.auth.signInWithPassword({
+async function signInWith(form: FormData): Promise<string> {
+  const { data, error } = await supabase.auth.signInWithPassword({
     email: String(form.get("email")),
     password: String(form.get("password")),
   });
-  if (signInError) return "Correo o contraseña incorrectos.";
+  if (error?.code === "email_not_confirmed") return "Primero debes confirmar tu correo.";
+  if (error) return "Correo o contraseña incorrectos.";
+  return `Entraste como ${data.user.email}`;
+}
 
-  const { data, error } = await supabase.functions.invoke("verify-access?project=conoce-mas", {
-    method: "GET",
+async function signUpWith(form: FormData): Promise<string> {
+  const { error } = await supabase.auth.signUp({
+    email: String(form.get("email")),
+    password: String(form.get("password")),
   });
-  if (data) return data.content;
-  if (error instanceof FunctionsHttpError && error.context.status === 403) {
-    return (await error.context.json()).error;
-  }
-  return "No se pudo verificar tu acceso. Intenta de nuevo.";
+  if (error?.code === "weak_password") return "La contraseña debe tener al menos 8 caracteres.";
+  if (error) return "No se pudo crear la cuenta. Intenta de nuevo.";
+  return "Revisa tu correo para confirmar tu cuenta.";
 }
 
 export default function App() {
   const [message, setMessage] = useState("");
-  const [verifying, setVerifying] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  async function signIn(event: FormEvent<HTMLFormElement>) {
+  // Al cargar, muestra la sesión que ya exista: la que trae el enlace de confirmación o una guardada.
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) setMessage(`Entraste como ${data.session.user.email}`);
+    });
+  }, []);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setVerifying(true);
+    const form = new FormData(event.currentTarget);
+    const intent = (event.nativeEvent as SubmitEvent).submitter?.getAttribute("value");
+    setSubmitting(true);
     try {
-      setMessage(await verifyAccess(new FormData(event.currentTarget)));
+      setMessage(await (intent === "signup" ? signUpWith(form) : signInWith(form)));
     } finally {
-      setVerifying(false);
+      setSubmitting(false);
     }
   }
 
@@ -41,9 +53,9 @@ export default function App() {
 
   return (
     <main>
-      <h1>conoce-mas</h1>
+      <h1>Portal de BlackMouth</h1>
       {!message && (
-        <form method="post" onSubmit={signIn}>
+        <form method="post" onSubmit={submit}>
           <label htmlFor="email">Correo</label>
           <input id="email" name="email" type="email" autoComplete="username" spellCheck={false} required />
           <label htmlFor="password">Contraseña</label>
@@ -55,8 +67,11 @@ export default function App() {
             enterKeyHint="done"
             required
           />
-          <button type="submit" disabled={verifying}>
+          <button type="submit" value="signin" disabled={submitting}>
             Iniciar sesión
+          </button>
+          <button type="submit" value="signup" disabled={submitting}>
+            Crear cuenta
           </button>
         </form>
       )}
