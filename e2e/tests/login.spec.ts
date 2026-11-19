@@ -286,3 +286,89 @@ test("al abrir el enlace de confirmación entro al portal con mi cuenta", async 
 
   await expect(page.getByText(`Entraste como ${email}`)).toBeVisible();
 });
+
+// Abre el portal y pide el enlace para recuperar la contraseña de ese correo.
+async function requestPasswordReset(page: Page, email: string) {
+  await page.goto("/");
+  await page.getByRole("button", { name: "¿Olvidaste tu contraseña?" }).click();
+  await page.getByLabel("Correo").fill(email);
+  await page.getByRole("button", { name: "Enviar enlace" }).click();
+}
+
+test("al pedir recuperar la contraseña con mi correo veo que me llegará un enlace", async ({ page }) => {
+  const email = `e2e-recuperar-${crypto.randomUUID()}@test.local`;
+  await admin.auth.admin.createUser({ email, password: "clave-de-prueba-123", email_confirm: true });
+
+  await requestPasswordReset(page, email);
+
+  await expect(page.getByText(`Te llegará un enlace a ${email} para recuperar tu contraseña.`)).toBeVisible();
+});
+
+// Pide el enlace de recuperación y lo abre desde el buzón de prueba.
+async function openPasswordResetLink(page: Page, email: string): Promise<string> {
+  await requestPasswordReset(page, email);
+  await expect(page.getByText(`Te llegará un enlace a ${email} para recuperar tu contraseña.`)).toBeVisible();
+  const link = await confirmationLink(email);
+  await page.goto(link);
+  return link;
+}
+
+test("al abrir el enlace de recuperación y guardar una contraseña nueva entro al portal", async ({ page }) => {
+  const email = `e2e-recuperar-entrar-${crypto.randomUUID()}@test.local`;
+  await admin.auth.admin.createUser({ email, password: "clave-de-prueba-123", email_confirm: true });
+
+  await openPasswordResetLink(page, email);
+
+  await expect(page.getByLabel("Contraseña nueva")).toBeVisible();
+  await expect(page.getByText(`Entraste como ${email}`)).toBeHidden();
+  await page.getByLabel("Contraseña nueva").fill("clave-nueva-456");
+  await page.getByRole("button", { name: "Guardar contraseña" }).click();
+
+  await expect(page.getByText(`Entraste como ${email}`)).toBeVisible();
+});
+
+test("después de recuperarla, la contraseña anterior ya no sirve y la nueva sí", async ({ page }) => {
+  const email = `e2e-recuperar-clave-anterior-${crypto.randomUUID()}@test.local`;
+  await admin.auth.admin.createUser({ email, password: "clave-de-prueba-123", email_confirm: true });
+  await openPasswordResetLink(page, email);
+  await page.getByLabel("Contraseña nueva").fill("clave-nueva-456");
+  await page.getByRole("button", { name: "Guardar contraseña" }).click();
+  await expect(page.getByText(`Entraste como ${email}`)).toBeVisible();
+  await page.getByRole("button", { name: "Cerrar sesión" }).click();
+  await expect(page.getByRole("button", { name: "Iniciar sesión" })).toBeVisible();
+
+  await signIn(page, email, "clave-de-prueba-123");
+  await expect(page.getByText("Correo o contraseña incorrectos.")).toBeVisible();
+
+  await page.getByLabel("Contraseña").fill("clave-nueva-456");
+  await page.getByRole("button", { name: "Iniciar sesión" }).click();
+  await expect(page.getByText(`Entraste como ${email}`)).toBeVisible();
+});
+
+test("con el enlace de recuperación no puedo guardar una contraseña de menos de 8 caracteres", async ({ page }) => {
+  const email = `e2e-recuperar-clave-corta-${crypto.randomUUID()}@test.local`;
+  await admin.auth.admin.createUser({ email, password: "clave-de-prueba-123", email_confirm: true });
+  await openPasswordResetLink(page, email);
+
+  await page.getByLabel("Contraseña nueva").fill("corta12");
+  await page.getByRole("button", { name: "Guardar contraseña" }).click();
+
+  await expect(page.getByText("La contraseña debe tener al menos 8 caracteres.")).toBeVisible();
+  await expect(page.getByLabel("Contraseña nueva")).toBeVisible();
+  await expect(page.getByText(`Entraste como ${email}`)).toBeHidden();
+});
+
+test("al abrir un enlace de recuperación que ya usé veo que debo pedir uno nuevo", async ({ page }) => {
+  const email = `e2e-recuperar-enlace-usado-${crypto.randomUUID()}@test.local`;
+  await admin.auth.admin.createUser({ email, password: "clave-de-prueba-123", email_confirm: true });
+  const link = await openPasswordResetLink(page, email);
+  await page.getByLabel("Contraseña nueva").fill("clave-nueva-456");
+  await page.getByRole("button", { name: "Guardar contraseña" }).click();
+  await expect(page.getByText(`Entraste como ${email}`)).toBeVisible();
+  await page.getByRole("button", { name: "Cerrar sesión" }).click();
+  await expect(page.getByRole("button", { name: "Iniciar sesión" })).toBeVisible();
+
+  await page.goto(link);
+
+  await expect(page.getByText("El enlace venció o ya se usó. Pide uno nuevo.")).toBeVisible();
+});
