@@ -25,8 +25,8 @@ jobs:
 
       - name: Lint y tipos de la app
         run: |
-          npm run lint -w conoce-mas
-          npm run build -w conoce-mas
+          npm run lint -w portal
+          npm run build -w portal
 
       - name: Lint, formato y tipos de las funciones
         run: |
