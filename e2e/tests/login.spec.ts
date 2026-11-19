@@ -17,15 +17,29 @@ async function fillSignUp(page: Page, email: string, password: string, { accept 
   if (accept) await acceptDocuments(page).check();
 }
 
+// Abre el portal e intenta iniciar sesión; cada prueba comprueba qué pasó.
+async function signIn(page: Page, email: string, password: string) {
+  await page.goto("/");
+  await page.getByLabel("Correo").fill(email);
+  await page.getByLabel("Contraseña").fill(password);
+  await page.getByRole("button", { name: "Iniciar sesión" }).click();
+}
+
+// Vuelve a abrir el portal en el mismo dispositivo: otra pestaña del mismo navegador, que conserva lo guardado.
+async function reopenPortal(page: Page): Promise<Page> {
+  const context = page.context();
+  await page.close();
+  const reopened = await context.newPage();
+  await reopened.goto("/");
+  return reopened;
+}
+
 test("al iniciar sesión veo con qué correo entré", async ({ page }) => {
   const email = `e2e-inicio-${crypto.randomUUID()}@test.local`;
   const password = "clave-de-prueba-123";
   await admin.auth.admin.createUser({ email, password, email_confirm: true });
 
-  await page.goto("/");
-  await page.getByLabel("Correo").fill(email);
-  await page.getByLabel("Contraseña").fill(password);
-  await page.getByRole("button", { name: "Iniciar sesión" }).click();
+  await signIn(page, email, password);
 
   await expect(page.getByText(`Entraste como ${email}`)).toBeVisible();
 });
@@ -34,33 +48,95 @@ test("con una contraseña equivocada veo que el correo o la contraseña no son c
   const email = `e2e-clave-equivocada-${crypto.randomUUID()}@test.local`;
   await admin.auth.admin.createUser({ email, password: "clave-de-prueba-123", email_confirm: true });
 
-  await page.goto("/");
-  await page.getByLabel("Correo").fill(email);
-  await page.getByLabel("Contraseña").fill("otra-clave-456");
-  await page.getByRole("button", { name: "Iniciar sesión" }).click();
+  await signIn(page, email, "otra-clave-456");
 
   await expect(page.getByText("Correo o contraseña incorrectos.")).toBeVisible();
 });
 
-test("después de entrar puedo probar con otra cuenta", async ({ page }) => {
+test("al cerrar sesión vuelvo al formulario de inicio", async ({ page }) => {
+  const email = `e2e-cerrar-sesion-${crypto.randomUUID()}@test.local`;
   const password = "clave-de-prueba-123";
-  const primera = `e2e-otra-cuenta-1-${crypto.randomUUID()}@test.local`;
-  const segunda = `e2e-otra-cuenta-2-${crypto.randomUUID()}@test.local`;
-  await admin.auth.admin.createUser({ email: primera, password, email_confirm: true });
-  await admin.auth.admin.createUser({ email: segunda, password, email_confirm: true });
+  await admin.auth.admin.createUser({ email, password, email_confirm: true });
 
-  await page.goto("/");
-  await page.getByLabel("Correo").fill(primera);
+  await signIn(page, email, password);
+  await expect(page.getByText(`Entraste como ${email}`)).toBeVisible();
+
+  await page.getByRole("button", { name: "Cerrar sesión" }).click();
+
+  await expect(page.getByRole("button", { name: "Iniciar sesión" })).toBeVisible();
+  await expect(page.getByText(`Entraste como ${email}`)).toBeHidden();
+});
+
+test("después de cerrar sesión, al volver a abrir el portal me pide iniciar sesión", async ({ page }) => {
+  const email = `e2e-reabrir-sin-sesion-${crypto.randomUUID()}@test.local`;
+  const password = "clave-de-prueba-123";
+  await admin.auth.admin.createUser({ email, password, email_confirm: true });
+
+  await signIn(page, email, password);
+  await expect(page.getByText(`Entraste como ${email}`)).toBeVisible();
+  await page.getByRole("button", { name: "Cerrar sesión" }).click();
+  await expect(page.getByRole("button", { name: "Iniciar sesión" })).toBeVisible();
+
+  const reopened = await reopenPortal(page);
+
+  await expect(reopened.getByRole("button", { name: "Iniciar sesión" })).toBeVisible();
+  await expect(reopened.getByText(`Entraste como ${email}`)).toBeHidden();
+});
+
+test("después de entrar, al volver a abrir el portal sigo dentro sin poner la contraseña", async ({ page }) => {
+  const email = `e2e-reabrir-con-sesion-${crypto.randomUUID()}@test.local`;
+  const password = "clave-de-prueba-123";
+  await admin.auth.admin.createUser({ email, password, email_confirm: true });
+
+  await signIn(page, email, password);
+  await expect(page.getByText(`Entraste como ${email}`)).toBeVisible();
+
+  const reopened = await reopenPortal(page);
+
+  await expect(reopened.getByText(`Entraste como ${email}`)).toBeVisible();
+  await expect(reopened.getByRole("button", { name: "Iniciar sesión" })).toBeHidden();
+});
+
+test('con la contraseña equivocada sigo en el formulario para corregirla y no veo el botón "Cerrar sesión"', async ({
+  page,
+}) => {
+  const email = `e2e-corregir-clave-${crypto.randomUUID()}@test.local`;
+  const password = "clave-de-prueba-123";
+  await admin.auth.admin.createUser({ email, password, email_confirm: true });
+
+  await signIn(page, email, "otra-clave-456");
+  await expect(page.getByText("Correo o contraseña incorrectos.")).toBeVisible();
+
+  await expect(page.getByRole("button", { name: "Cerrar sesión" })).toBeHidden();
   await page.getByLabel("Contraseña").fill(password);
   await page.getByRole("button", { name: "Iniciar sesión" }).click();
-  await expect(page.getByText(`Entraste como ${primera}`)).toBeVisible();
 
-  await page.getByRole("button", { name: "Probar con otra cuenta" }).click();
-  await page.getByLabel("Correo").fill(segunda);
-  await page.getByLabel("Contraseña").fill(password);
-  await page.getByRole("button", { name: "Iniciar sesión" }).click();
+  await expect(page.getByText(`Entraste como ${email}`)).toBeVisible();
+});
 
-  await expect(page.getByText(`Entraste como ${segunda}`)).toBeVisible();
+test("al volver a abrir el portal con la sesión guardada no aparece el formulario ni por un instante", async ({
+  context,
+  page,
+}) => {
+  const email = `e2e-sin-parpadeo-${crypto.randomUUID()}@test.local`;
+  const password = "clave-de-prueba-123";
+  await admin.auth.admin.createUser({ email, password, email_confirm: true });
+
+  await signIn(page, email, password);
+  await expect(page.getByText(`Entraste como ${email}`)).toBeVisible();
+
+  // Anota si algún formulario llega a estar en la página, aunque desaparezca enseguida.
+  await context.addInitScript(() => {
+    const seen = window as unknown as { formAppeared: boolean };
+    seen.formAppeared = false;
+    new MutationObserver(() => {
+      if (document.querySelector("form")) seen.formAppeared = true;
+    }).observe(document, { childList: true, subtree: true });
+  });
+  const reopened = await reopenPortal(page);
+
+  await expect(reopened.getByText(`Entraste como ${email}`)).toBeVisible();
+  expect(await reopened.evaluate(() => (window as unknown as { formAppeared: boolean }).formAppeared)).toBe(false);
 });
 
 test("mientras inicio sesión no puedo volver a enviar el formulario", async ({ page }) => {
@@ -74,10 +150,7 @@ test("mientras inicio sesión no puedo volver a enviar el formulario", async ({ 
     await route.continue();
   });
 
-  await page.goto("/");
-  await page.getByLabel("Correo").fill(email);
-  await page.getByLabel("Contraseña").fill(password);
-  await page.getByRole("button", { name: "Iniciar sesión" }).click();
+  await signIn(page, email, password);
 
   await expect(page.getByRole("button", { name: "Iniciar sesión" })).toBeDisabled();
   release();
@@ -183,10 +256,7 @@ test("si no he confirmado mi correo e intento entrar, veo que primero debo confi
   const password = "clave-de-prueba-123";
   await admin.auth.admin.createUser({ email, password, email_confirm: false });
 
-  await page.goto("/");
-  await page.getByLabel("Correo").fill(email);
-  await page.getByLabel("Contraseña").fill(password);
-  await page.getByRole("button", { name: "Iniciar sesión" }).click();
+  await signIn(page, email, password);
 
   await expect(page.getByText("Primero debes confirmar tu correo.")).toBeVisible();
 });
