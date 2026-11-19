@@ -1,0 +1,99 @@
+import { expect, test, type Page } from "@playwright/test";
+import { createClient } from "@supabase/supabase-js";
+
+const admin = createClient(process.env.API_URL!, process.env.SECRET_KEY!, {
+  auth: { persistSession: false, autoRefreshToken: false },
+});
+
+const password = "clave-de-prueba-123";
+
+// Crea una cuenta confirmada para la prueba y devuelve su correo.
+async function createUser(name: string): Promise<string> {
+  const email = `e2e-${name}-${crypto.randomUUID()}@test.local`;
+  await admin.auth.admin.createUser({ email, password, email_confirm: true });
+  return email;
+}
+
+// Guarda el perfil con la sesión del propio usuario: la clave secreta no tiene permisos sobre los perfiles.
+async function saveProfileAs(email: string, profile: { full_name: string; phone: string }) {
+  const client = createClient(process.env.API_URL!, process.env.PUBLISHABLE_KEY!, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { data } = await client.auth.signInWithPassword({ email, password });
+  const { error } = await client.from("profiles").insert({ user_id: data.user!.id, ...profile });
+  if (error) throw error;
+}
+
+// Abre el portal, inicia sesión y abre "Mi perfil".
+async function openProfile(page: Page, email: string) {
+  await page.goto("/");
+  await page.getByLabel("Correo").fill(email);
+  await page.getByLabel("Contraseña").fill(password);
+  await page.getByRole("button", { name: "Iniciar sesión" }).click();
+  await page.getByRole("button", { name: "Mi perfil" }).click();
+}
+
+test("al abrir mi perfil veo mi correo, mi nombre y mi teléfono", async ({ page }) => {
+  const email = await createUser("perfil-ver");
+  await saveProfileAs(email, { full_name: "Ana Gómez", phone: "3001234567" });
+
+  await openProfile(page, email);
+
+  await expect(page.getByLabel("Correo")).toHaveValue(email);
+  await expect(page.getByLabel("Nombre")).toHaveValue("Ana Gómez");
+  await expect(page.getByLabel("Teléfono")).toHaveValue("3001234567");
+});
+
+// Llena el perfil y lo guarda.
+async function fillAndSaveProfile(page: Page, fullName: string, phone: string) {
+  await page.getByLabel("Nombre").fill(fullName);
+  await page.getByLabel("Teléfono").fill(phone);
+  await page.getByRole("button", { name: "Guardar perfil" }).click();
+}
+
+// Vuelve al perfil: recarga el portal, que conserva la sesión, y abre "Mi perfil" otra vez.
+async function reopenProfile(page: Page) {
+  await page.reload();
+  await page.getByRole("button", { name: "Mi perfil" }).click();
+}
+
+test("al guardar mi nombre y un celular de 10 dígitos veo que se guardaron y siguen ahí al volver", async ({ page }) => {
+  const email = await createUser("perfil-guardar");
+  await openProfile(page, email);
+
+  await fillAndSaveProfile(page, "Beto Ruiz", "3107654321");
+  await expect(page.getByText("Guardamos tu perfil.")).toBeVisible();
+  await reopenProfile(page);
+  await expect(page.getByLabel("Nombre")).toHaveValue("Beto Ruiz");
+  await expect(page.getByLabel("Teléfono")).toHaveValue("3107654321");
+
+  await fillAndSaveProfile(page, "Beto Ruiz Díaz", "3209876543");
+  await expect(page.getByText("Guardamos tu perfil.")).toBeVisible();
+  await reopenProfile(page);
+  await expect(page.getByLabel("Nombre")).toHaveValue("Beto Ruiz Díaz");
+  await expect(page.getByLabel("Teléfono")).toHaveValue("3209876543");
+});
+
+test("sin nombre no se guarda mi perfil y veo que debo escribirlo", async ({ page }) => {
+  const email = await createUser("perfil-sin-nombre");
+  await saveProfileAs(email, { full_name: "Ana Gómez", phone: "3001234567" });
+  await openProfile(page, email);
+
+  await fillAndSaveProfile(page, "", "3001234567");
+
+  await expect(page.getByText("Escribe tu nombre.")).toBeVisible();
+  await reopenProfile(page);
+  await expect(page.getByLabel("Nombre")).toHaveValue("Ana Gómez");
+});
+
+test("con un teléfono que no es celular colombiano no se guarda y veo cómo debe ser", async ({ page }) => {
+  const email = await createUser("perfil-telefono");
+  await saveProfileAs(email, { full_name: "Ana Gómez", phone: "3001234567" });
+  await openProfile(page, email);
+
+  await fillAndSaveProfile(page, "Ana Gómez", "2001234567");
+
+  await expect(page.getByText("El teléfono debe ser un celular colombiano: 10 dígitos que empiezan por 3.")).toBeVisible();
+  await reopenProfile(page);
+  await expect(page.getByLabel("Teléfono")).toHaveValue("3001234567");
+});

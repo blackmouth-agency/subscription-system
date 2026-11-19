@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(20);
+select plan(23);
 
 select is_empty(
   $$ select c.relname::text
@@ -20,6 +20,8 @@ select table_privs_are('public', 'legal_documents', 'anon', array[]::text[],
   'anon no tiene permisos sobre legal_documents');
 select table_privs_are('public', 'document_acceptances', 'anon', array[]::text[],
   'anon no tiene permisos sobre document_acceptances');
+select table_privs_are('public', 'profiles', 'anon', array[]::text[],
+  'anon no tiene permisos sobre profiles');
 
 select table_privs_are('public', 'projects', 'authenticated', array['SELECT'],
   'authenticated solo puede leer projects');
@@ -29,6 +31,8 @@ select table_privs_are('public', 'legal_documents', 'authenticated', array[]::te
   'authenticated no tiene permisos sobre legal_documents');
 select table_privs_are('public', 'document_acceptances', 'authenticated', array[]::text[],
   'authenticated no tiene permisos sobre document_acceptances');
+select table_privs_are('public', 'profiles', 'authenticated', array['SELECT', 'INSERT', 'UPDATE'],
+  'authenticated lee, crea y cambia profiles, pero no los borra');
 
 select table_privs_are('public', 'projects', 'service_role', array['SELECT', 'INSERT', 'UPDATE'],
   'service_role lee, crea y cambia projects');
@@ -38,6 +42,8 @@ select table_privs_are('public', 'legal_documents', 'service_role', array['SELEC
   'service_role solo puede leer legal_documents');
 select table_privs_are('public', 'document_acceptances', 'service_role', array['SELECT'],
   'service_role solo puede leer document_acceptances');
+select table_privs_are('public', 'profiles', 'service_role', array[]::text[],
+  'service_role no tiene permisos sobre profiles');
 
 -- Una función security definer corre con los permisos de su dueño: nadie de la API la ejecuta.
 select is_empty(
