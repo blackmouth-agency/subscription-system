@@ -1,6 +1,10 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { createClient, type Session } from "@supabase/supabase-js";
 
+// Un enlace de correo vencido o ya usado vuelve al portal con el error en la URL. Se lee antes de crear el cliente,
+// que también procesa la URL al arrancar.
+const linkExpired = new URLSearchParams(window.location.hash.slice(1)).get("error_code") === "otp_expired";
+
 const supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY);
 
 async function signInWith(form: FormData): Promise<string> {
@@ -24,6 +28,12 @@ async function signUpWith(form: FormData): Promise<string> {
   return "Revisa tu correo para confirmar tu cuenta.";
 }
 
+async function requestPasswordResetFor(form: FormData): Promise<string> {
+  const email = String(form.get("email"));
+  await supabase.auth.resetPasswordForEmail(email);
+  return `Te llegará un enlace a ${email} para recuperar tu contraseña.`;
+}
+
 function CredentialFields({ passwordAutoComplete }: { passwordAutoComplete: "current-password" | "new-password" }) {
   return (
     <>
@@ -45,13 +55,19 @@ function CredentialFields({ passwordAutoComplete }: { passwordAutoComplete: "cur
 export default function App() {
   // undefined mientras se averigua si el dispositivo tiene una sesión guardada.
   const [session, setSession] = useState<Session | null | undefined>(undefined);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(linkExpired ? "El enlace venció o ya se usó. Pide uno nuevo." : "");
   const [submitting, setSubmitting] = useState(false);
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [mode, setMode] = useState<"signin" | "signup" | "forgot">("signin");
+  // true desde que se abre el enlace de recuperación hasta que se guarda la contraseña nueva.
+  const [recovering, setRecovering] = useState(false);
 
-  // Sigue la sesión del dispositivo: al cargar (la guardada o la del enlace de confirmación), al entrar y al salir.
+  // Sigue la sesión del dispositivo: al cargar (la guardada o la del enlace de confirmación o de recuperación),
+  // al entrar y al salir.
   useEffect(() => {
-    const { data } = supabase.auth.onAuthStateChange((_event, session) => setSession(session));
+    const { data } = supabase.auth.onAuthStateChange((event, session) => {
+      setSession(session);
+      if (event === "PASSWORD_RECOVERY") setRecovering(true);
+    });
     return () => data.subscription.unsubscribe();
   }, []);
 
@@ -77,10 +93,22 @@ export default function App() {
               Iniciar sesión
             </button>
           </form>
+          <button type="button" onClick={() => setMode("forgot")}>
+            ¿Olvidaste tu contraseña?
+          </button>
           <button type="button" onClick={() => setMode("signup")}>
             Crear una cuenta
           </button>
         </>
+      )}
+      {session === null && mode === "forgot" && (
+        <form method="post" onSubmit={(event) => submit(event, requestPasswordResetFor)}>
+          <label htmlFor="email">Correo</label>
+          <input id="email" name="email" type="email" autoComplete="username" spellCheck={false} required />
+          <button type="submit" disabled={submitting}>
+            Enviar enlace
+          </button>
+        </form>
       )}
       {session === null && mode === "signup" && (
         <>
@@ -106,8 +134,32 @@ export default function App() {
           </button>
         </>
       )}
-      <p role="status">{session ? `Entraste como ${session.user.email}` : message}</p>
-      {session && (
+      {session && recovering && (
+        <form
+          method="post"
+          onSubmit={(event) =>
+            submit(event, async (form) => {
+              const { error } = await supabase.auth.updateUser({ password: String(form.get("password")) });
+              if (error?.code === "weak_password") return "La contraseña debe tener al menos 8 caracteres.";
+              setRecovering(false);
+              return "";
+            })
+          }
+        >
+          <label htmlFor="new-password">Contraseña nueva</label>
+          <input
+            id="new-password"
+            name="password"
+            type="password"
+            autoComplete="new-password"
+            enterKeyHint="done"
+            required
+          />
+          <button type="submit">Guardar contraseña</button>
+        </form>
+      )}
+      <p role="status">{session && !recovering ? `Entraste como ${session.user.email}` : message}</p>
+      {session && !recovering && (
         <button type="button" onClick={() => supabase.auth.signOut()}>
           Cerrar sesión
         </button>
