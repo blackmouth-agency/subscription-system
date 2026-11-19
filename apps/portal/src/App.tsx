@@ -1,16 +1,16 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type Session } from "@supabase/supabase-js";
 
 const supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY);
 
 async function signInWith(form: FormData): Promise<string> {
-  const { data, error } = await supabase.auth.signInWithPassword({
+  const { error } = await supabase.auth.signInWithPassword({
     email: String(form.get("email")),
     password: String(form.get("password")),
   });
   if (error?.code === "email_not_confirmed") return "Primero debes confirmar tu correo.";
   if (error) return "Correo o contraseña incorrectos.";
-  return `Entraste como ${data.user.email}`;
+  return "";
 }
 
 async function signUpWith(form: FormData): Promise<string> {
@@ -43,15 +43,16 @@ function CredentialFields({ passwordAutoComplete }: { passwordAutoComplete: "cur
 }
 
 export default function App() {
+  // undefined mientras se averigua si el dispositivo tiene una sesión guardada.
+  const [session, setSession] = useState<Session | null | undefined>(undefined);
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [mode, setMode] = useState<"signin" | "signup">("signin");
 
-  // Al cargar, muestra la sesión que ya exista: la que trae el enlace de confirmación o una guardada.
+  // Sigue la sesión del dispositivo: al cargar (la guardada o la del enlace de confirmación), al entrar y al salir.
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) setMessage(`Entraste como ${data.session.user.email}`);
-    });
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => setSession(session));
+    return () => data.subscription.unsubscribe();
   }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>, send: (form: FormData) => Promise<string>) {
@@ -65,15 +66,10 @@ export default function App() {
     }
   }
 
-  async function tryAnotherAccount() {
-    await supabase.auth.signOut();
-    setMessage("");
-  }
-
   return (
     <main>
       <h1>Portal de BlackMouth</h1>
-      {!message && mode === "signin" && (
+      {session === null && mode === "signin" && (
         <>
           <form method="post" onSubmit={(event) => submit(event, signInWith)}>
             <CredentialFields passwordAutoComplete="current-password" />
@@ -86,7 +82,7 @@ export default function App() {
           </button>
         </>
       )}
-      {!message && mode === "signup" && (
+      {session === null && mode === "signup" && (
         <>
           <form method="post" onSubmit={(event) => submit(event, signUpWith)}>
             <CredentialFields passwordAutoComplete="new-password" />
@@ -110,10 +106,10 @@ export default function App() {
           </button>
         </>
       )}
-      <p role="status">{message}</p>
-      {message && (
-        <button type="button" onClick={tryAnotherAccount}>
-          Probar con otra cuenta
+      <p role="status">{session ? `Entraste como ${session.user.email}` : message}</p>
+      {session && (
+        <button type="button" onClick={() => supabase.auth.signOut()}>
+          Cerrar sesión
         </button>
       )}
     </main>
