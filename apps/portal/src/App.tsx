@@ -52,6 +52,58 @@ function CredentialFields({ passwordAutoComplete }: { passwordAutoComplete: "cur
   );
 }
 
+type Profile = { full_name: string; phone: string };
+
+// El correo es solo de lectura. El perfil existe desde la primera vez que se guarda: antes, los campos van vacíos.
+function MyProfile({ userId, email }: { userId: string; email: string }) {
+  // undefined mientras se carga; null si todavía no lo ha guardado.
+  const [profile, setProfile] = useState<Profile | null | undefined>(undefined);
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    supabase
+      .from("profiles")
+      .select("full_name, phone")
+      .maybeSingle()
+      .then(({ data }) => setProfile(data));
+  }, []);
+
+  async function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const { error } = await supabase
+      .from("profiles")
+      .upsert({ user_id: userId, full_name: String(form.get("full_name")), phone: String(form.get("phone")) });
+    // El servidor valida el perfil; el aviso sale de la regla que rechazó el cambio.
+    if (error?.message.includes("profiles_full_name_check")) return setMessage("Escribe tu nombre.");
+    if (error?.message.includes("profiles_phone_check")) {
+      return setMessage("El teléfono debe ser un celular colombiano: 10 dígitos que empiezan por 3.");
+    }
+    setMessage("Guardamos tu perfil.");
+  }
+
+  if (profile === undefined) return null;
+  return (
+    <form method="post" onSubmit={save}>
+      <label htmlFor="profile-email">Correo</label>
+      <input id="profile-email" type="email" value={email} readOnly />
+      <label htmlFor="full-name">Nombre</label>
+      <input id="full-name" name="full_name" autoComplete="name" defaultValue={profile?.full_name} />
+      <label htmlFor="phone">Teléfono</label>
+      <input
+        id="phone"
+        name="phone"
+        type="tel"
+        autoComplete="tel-national"
+        inputMode="numeric"
+        defaultValue={profile?.phone}
+      />
+      <button type="submit">Guardar perfil</button>
+      <p role="status">{message}</p>
+    </form>
+  );
+}
+
 export default function App() {
   // undefined mientras se averigua si el dispositivo tiene una sesión guardada.
   const [session, setSession] = useState<Session | null | undefined>(undefined);
@@ -60,6 +112,7 @@ export default function App() {
   const [mode, setMode] = useState<"signin" | "signup" | "forgot">("signin");
   // true desde que se abre el enlace de recuperación hasta que se guarda la contraseña nueva.
   const [recovering, setRecovering] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
 
   // Sigue la sesión del dispositivo: al cargar (la guardada o la del enlace de confirmación o de recuperación),
   // al entrar y al salir.
@@ -160,10 +213,16 @@ export default function App() {
       )}
       <p role="status">{session && !recovering ? `Entraste como ${session.user.email}` : message}</p>
       {session && !recovering && (
-        <button type="button" onClick={() => supabase.auth.signOut()}>
-          Cerrar sesión
-        </button>
+        <>
+          <button type="button" onClick={() => setShowProfile(true)}>
+            Mi perfil
+          </button>
+          <button type="button" onClick={() => supabase.auth.signOut()}>
+            Cerrar sesión
+          </button>
+        </>
       )}
+      {session && !recovering && showProfile && <MyProfile userId={session.user.id} email={session.user.email!} />}
     </main>
   );
 }
