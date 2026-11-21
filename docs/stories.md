@@ -18,7 +18,13 @@ Supuestos: los montos son enteros en COP y "vencida" no se guarda, se calcula co
    - Portal: página `/admin/products` en el área admin, con los organismos `ProductForm` (React Hook Form) y `ProductTable`, un template y la page con los datos vía axios. El precio se muestra en COP con `Intl.NumberFormat`.
    - Pruebas: pgTAP (`products.test.sql`: admin inserta y lee, no admin ni ve ni inserta, rechaza precio ≤ 0), Deno (validación y 403) y Playwright (`products.spec.ts`: el admin crea un producto y lo ve en la lista; un no admin ve "Sin acceso").
    - Fuera: editar, retirar, categorías, planes múltiples y paginación.
-3. **Clientes:** crear, listar y editar.
+3. **Clientes:** crear, listar y editar (MVP-CLI-01, CLI-02).
+   - Tabla `public.clients`: `id uuid pk`, `name text not null` (nombre o razón social), `contact_name text not null default ''`, `email text not null default ''`, `phone text not null default ''` (teléfono/WhatsApp), `created_at` y `updated_at`. Checks: `name` sin espacios sobrantes ni vacío. Nombre y correo pueden repetirse. Sin documento (NIT/cédula) hasta resolver `qa.md` §7.
+   - RLS con `select`, `insert` y `update` y `(select public.is_admin())` en `using` y `with check`. GRANT solo `select, insert, update` a `authenticated`: sin `delete`, un cliente no se borra. `updated_at` lo mantiene un trigger `before update`.
+   - API (`modules/clients/`): `GET /api/clients` (lista por nombre), `POST /api/clients` y `PATCH /api/clients/:id` (cambios parciales; 404 "Cliente no encontrado" si no existe). `validate` con zod (`name` 1–100, `contact_name` ≤ 100, `email` formato válido o vacío, `phone` ≤ 30; `id` uuid). Sin rol admin responde 403 "Sin acceso". Sin RPC: no toca dinero.
+   - Portal: página `/admin/clients` en el área admin, con los organismos `ClientForm` (React Hook Form, sirve para crear y editar) y `ClientTable` (botón "Editar" por fila que carga el cliente en el formulario), un template y la page con los datos vía axios.
+   - Pruebas: pgTAP (`clients.test.sql`: admin inserta, lee y actualiza; no admin ni ve, ni inserta ni actualiza; nadie borra; rechaza nombre vacío), Deno (validación, 403, 404 y PATCH parcial) y Playwright (`clients.spec.ts`: el admin crea un cliente, lo edita y ve el cambio en la lista; un no admin ve "Sin acceso").
+   - Fuera: borrar o archivar, búsqueda y paginación, documento de identidad, ver las suscripciones y cobros del cliente (llega con la historia 5) y consentimiento de datos.
 4. **Socios:** crear, listar y editar, con un campo activo y una cuenta receptora en texto.
 5. **Suscripción directa:** cliente y producto, con el precio de catálogo editable, la fecha del ciclo en hoy (editable), estado "pendiente", comisión $0 y la agencia como receptor. Se ve en el listado y en el cliente.
 6. **Socio en la suscripción:** socio, comisión fija, duración (indefinida, N mensualidades o única) y receptor (agencia o socio).

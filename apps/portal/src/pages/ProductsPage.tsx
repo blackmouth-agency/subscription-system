@@ -1,5 +1,5 @@
-import axios from "axios";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { createApi } from "../api";
 import ProductForm, { type NewProduct } from "../organisms/ProductForm";
 import ProductTable, { type Product } from "../organisms/ProductTable";
 import ProductsTemplate from "../templates/ProductsTemplate";
@@ -8,20 +8,10 @@ export default function ProductsPage({ accessToken }: { accessToken: string }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [error, setError] = useState("");
 
-  const api = useCallback(
-    () =>
-      axios.create({
-        baseURL: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/api`,
-        headers: {
-          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          Authorization: `Bearer ${accessToken}`,
-        },
-      }),
-    [accessToken],
-  );
+  const api = useMemo(() => createApi(accessToken), [accessToken]);
 
   useEffect(() => {
-    api()
+    api
       .get<Product[]>("/products")
       .then(({ data }) => setProducts(data))
       .catch(() => setError("No pudimos cargar los productos."));
@@ -29,7 +19,7 @@ export default function ProductsPage({ accessToken }: { accessToken: string }) {
 
   async function createProduct(product: NewProduct) {
     try {
-      const { data } = await api().post<Product>("/products", product);
+      const { data } = await api.post<Product>("/products", product);
       setProducts((current) =>
         [...current, data].sort((a, b) => a.name.localeCompare(b.name)),
       );
