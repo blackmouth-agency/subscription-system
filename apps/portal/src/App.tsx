@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { createClient, type Session } from "@supabase/supabase-js";
-import HelloPage from "./pages/HelloPage";
+import ProductsPage from "./pages/ProductsPage";
 import AdminTemplate from "./templates/AdminTemplate";
 
 // Un enlace de correo vencido o ya usado vuelve al portal con el error en la
@@ -277,7 +277,6 @@ export default function App() {
   return (
     <main>
       <h1>Portal de BlackMouth</h1>
-      <HelloPage />
       {session === null && mode === "signin" && (
         <>
           <form method="post" onSubmit={(event) => submit(event, signInWith)}>
@@ -382,7 +381,13 @@ export default function App() {
           ? `Entraste como ${session.user.email}`
           : message}
       </p>
-      {session && !recovering && isAdmin === true && <AdminTemplate />}
+      {session && !recovering && isAdmin === true && (
+        <AdminTemplate>
+          {window.location.pathname === "/admin/products" && (
+            <ProductsPage accessToken={session.access_token} />
+          )}
+        </AdminTemplate>
+      )}
       {session && !recovering && isAdmin === false && <p>Sin acceso</p>}
       {session && !recovering && (
         <>

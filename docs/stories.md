@@ -12,6 +12,12 @@ Supuestos: los montos son enteros en COP y "vencida" no se guarda, se calcula co
    - Pruebas: pgTAP (`admins.test.sql`, más los permisos en `security.test.sql`) y Playwright (`admin.spec.ts`, que da el rol con conexión directa a `DB_URL`).
    - Fuera: varios roles, pantalla para asignarlos y registrar quién dio el rol.
 2. **Catálogo:** crear y listar productos (nombre, descripción y precio entero en COP).
+   - Tabla `public.products`: `id uuid pk`, `name text not null`, `description text not null default ''`, `price integer not null`, `is_active boolean not null default true` y `created_at`. Checks: `price > 0` y `name` sin espacios sobrantes ni vacío. El nombre puede repetirse.
+   - RLS con `select` e `insert` y `(select public.is_admin())` en `using` y `with check`. GRANT solo `select, insert` a `authenticated`: sin `update` ni `delete` hasta que se editen y retiren productos.
+   - API (`modules/products/`): `GET /api/products` (lista por nombre) y `POST /api/products`. `validate` con zod (`name` 1–100, `description` ≤ 500, `price` entero positivo). Sin rol admin responde 403 "Sin acceso". No lleva RPC porque no toca dinero.
+   - Portal: página `/admin/products` en el área admin, con los organismos `ProductForm` (React Hook Form) y `ProductTable`, un template y la page con los datos vía axios. El precio se muestra en COP con `Intl.NumberFormat`.
+   - Pruebas: pgTAP (`products.test.sql`: admin inserta y lee, no admin ni ve ni inserta, rechaza precio ≤ 0), Deno (validación y 403) y Playwright (`products.spec.ts`: el admin crea un producto y lo ve en la lista; un no admin ve "Sin acceso").
+   - Fuera: editar, retirar, categorías, planes múltiples y paginación.
 3. **Clientes:** crear, listar y editar.
 4. **Socios:** crear, listar y editar, con un campo activo y una cuenta receptora en texto.
 5. **Suscripción directa:** cliente y producto, con el precio de catálogo editable, la fecha del ciclo en hoy (editable), estado "pendiente", comisión $0 y la agencia como receptor. Se ve en el listado y en el cliente.
