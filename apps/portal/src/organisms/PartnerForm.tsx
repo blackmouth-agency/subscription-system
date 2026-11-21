@@ -1,4 +1,6 @@
 import { useForm } from "react-hook-form";
+import { maxLength, trim } from "../forms";
+import FormField from "../molecules/FormField";
 
 export type PartnerData = {
   name: string;
@@ -29,7 +31,6 @@ export default function PartnerForm({
   } = useForm<PartnerData>({
     defaultValues: partner ?? { is_active: true },
   });
-  const trim = (value: string) => value.trim();
 
   return (
     <form
@@ -38,51 +39,48 @@ export default function PartnerForm({
         if (await onSubmit(data)) reset({ is_active: true });
       })}
     >
-      <label htmlFor="partner-name">Nombre o razón social</label>
-      <input
+      <FormField
         id="partner-name"
+        label="Nombre o razón social"
+        error={errors.name?.message}
         {...register("name", {
           setValueAs: trim,
           required: "Escribe el nombre.",
-          maxLength: { value: 100, message: "Máximo 100 caracteres." },
+          maxLength: maxLength(100),
         })}
       />
-      <span role="alert">{errors.name?.message}</span>
-      <label htmlFor="partner-contact">Contacto</label>
-      <input
+      <FormField
         id="partner-contact"
+        label="Contacto"
+        error={errors.contact_name?.message}
         {...register("contact_name", {
           setValueAs: trim,
-          maxLength: { value: 100, message: "Máximo 100 caracteres." },
+          maxLength: maxLength(100),
         })}
       />
-      <span role="alert">{errors.contact_name?.message}</span>
-      <label htmlFor="partner-email">Correo</label>
-      <input
+      <FormField
         id="partner-email"
+        label="Correo"
         type="email"
+        error={errors.email?.message}
         {...register("email", { setValueAs: trim })}
       />
-      <span role="alert">{errors.email?.message}</span>
-      <label htmlFor="partner-phone">Teléfono / WhatsApp</label>
-      <input
+      <FormField
         id="partner-phone"
+        label="Teléfono / WhatsApp"
         type="tel"
-        {...register("phone", {
-          setValueAs: trim,
-          maxLength: { value: 30, message: "Máximo 30 caracteres." },
-        })}
+        error={errors.phone?.message}
+        {...register("phone", { setValueAs: trim, maxLength: maxLength(30) })}
       />
-      <span role="alert">{errors.phone?.message}</span>
-      <label htmlFor="partner-account">Cuenta receptora</label>
-      <input
+      <FormField
         id="partner-account"
+        label="Cuenta receptora"
+        error={errors.receiving_account?.message}
         {...register("receiving_account", {
           setValueAs: trim,
-          maxLength: { value: 200, message: "Máximo 200 caracteres." },
+          maxLength: maxLength(200),
         })}
       />
-      <span role="alert">{errors.receiving_account?.message}</span>
       <input id="partner-active" type="checkbox" {...register("is_active")} />
       <label htmlFor="partner-active">Activo</label>
       <button type="submit" disabled={isSubmitting}>

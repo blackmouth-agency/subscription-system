@@ -1,6 +1,4 @@
-import { createFactory } from "hono/factory";
-import { HTTPException } from "hono/http-exception";
-import { createClient } from "@supabase/supabase-js";
+import { crudService } from "../../shared/crud.ts";
 
 type Partner = {
   id: string;
@@ -13,54 +11,8 @@ type Partner = {
   created_at: string;
   updated_at: string;
 };
-type Env = {
-  Variables: { partners: Partner[]; partner: Partner };
-};
 
-export const factory = createFactory<Env>();
-
-// Cliente con el JWT del usuario: la RLS decide, no esta función.
-async function adminDb(authorization: string, apikey: string) {
-  const db = createClient(Deno.env.get("SUPABASE_URL")!, apikey, {
-    global: { headers: { Authorization: authorization } },
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  const { data } = await db.rpc("is_admin");
-  if (data !== true) throw new HTTPException(403, { message: "Sin acceso" });
-  return db;
-}
-
-export const authorizeAndList = factory.createMiddleware(async (c, next) => {
-  const { authorization, apikey } = c.req.valid("header" as never);
-  const db = await adminDb(authorization, apikey);
-  const { data, error } = await db.from("partners").select("*").order("name");
-  if (error) throw new HTTPException(500, { message: "Error interno." });
-  c.set("partners", data);
-  await next();
-});
-
-export const authorizeAndCreate = factory.createMiddleware(async (c, next) => {
-  const { authorization, apikey } = c.req.valid("header" as never);
-  const body = c.req.valid("json" as never);
-  const db = await adminDb(authorization, apikey);
-  const { data, error } = await db.from("partners").insert(body).select()
-    .single();
-  if (error) throw new HTTPException(500, { message: "Error interno." });
-  c.set("partner", data);
-  await next();
-});
-
-export const authorizeAndUpdate = factory.createMiddleware(async (c, next) => {
-  const { authorization, apikey } = c.req.valid("header" as never);
-  const { id } = c.req.valid("param" as never);
-  const body = c.req.valid("json" as never);
-  const db = await adminDb(authorization, apikey);
-  const { data, error } = await db.from("partners").update(body).eq("id", id)
-    .select();
-  if (error) throw new HTTPException(500, { message: "Error interno." });
-  if (data.length === 0) {
-    throw new HTTPException(404, { message: "Socio no encontrado" });
-  }
-  c.set("partner", data[0]);
-  await next();
+export const service = crudService<Partner>({
+  table: "partners",
+  notFound: "Socio no encontrado",
 });

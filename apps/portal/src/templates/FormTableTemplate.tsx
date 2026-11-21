@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-export default function PartnersTemplate({
+export default function FormTableTemplate({
   form,
   table,
 }: {

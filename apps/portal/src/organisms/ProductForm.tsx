@@ -1,4 +1,6 @@
 import { useForm } from "react-hook-form";
+import { maxLength, trim } from "../forms";
+import FormField from "../molecules/FormField";
 
 export type NewProduct = {
   name: string;
@@ -10,7 +12,7 @@ export default function ProductForm({
   onSubmit,
   error,
 }: {
-  onSubmit: (product: NewProduct) => Promise<void>;
+  onSubmit: (product: NewProduct) => Promise<boolean>;
   error: string;
 }) {
   const {
@@ -24,33 +26,32 @@ export default function ProductForm({
     <form
       method="post"
       onSubmit={handleSubmit(async (product) => {
-        await onSubmit(product);
-        reset();
+        if (await onSubmit(product)) reset();
       })}
     >
-      <label htmlFor="product-name">Nombre</label>
-      <input
+      <FormField
         id="product-name"
+        label="Nombre"
+        error={errors.name?.message}
         {...register("name", {
-          setValueAs: (value: string) => value.trim(),
+          setValueAs: trim,
           required: "Escribe el nombre.",
-          maxLength: { value: 100, message: "Máximo 100 caracteres." },
+          maxLength: maxLength(100),
         })}
       />
-      <span role="alert">{errors.name?.message}</span>
-      <label htmlFor="product-description">Descripción</label>
-      <textarea
+      <FormField
+        multiline
         id="product-description"
-        {...register("description", {
-          maxLength: { value: 500, message: "Máximo 500 caracteres." },
-        })}
+        label="Descripción"
+        error={errors.description?.message}
+        {...register("description", { maxLength: maxLength(500) })}
       />
-      <span role="alert">{errors.description?.message}</span>
-      <label htmlFor="product-price">Precio (COP)</label>
-      <input
+      <FormField
         id="product-price"
+        label="Precio (COP)"
         type="number"
         inputMode="numeric"
+        error={errors.price?.message}
         {...register("price", {
           valueAsNumber: true,
           validate: (price) =>
@@ -58,7 +59,6 @@ export default function ProductForm({
             "El precio debe ser un entero mayor a 0.",
         })}
       />
-      <span role="alert">{errors.price?.message}</span>
       <button type="submit" disabled={isSubmitting}>
         Crear producto
       </button>
