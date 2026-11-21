@@ -68,6 +68,7 @@ jobs:
         run: |
           npx supabase functions deploy verify-access --remote="$SUPABASE_PROJECT_ID" --yes
           npx supabase functions deploy delete-account --remote="$SUPABASE_PROJECT_ID" --yes
+          npx supabase functions deploy api --remote="$SUPABASE_PROJECT_ID" --yes
 
       - name: Construir la app
         working-directory: apps/portal

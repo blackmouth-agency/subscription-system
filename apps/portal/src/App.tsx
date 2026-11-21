@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { createClient, type Session } from "@supabase/supabase-js";
+import HelloPage from "./pages/HelloPage";
 
 // Un enlace de correo vencido o ya usado vuelve al portal con el error en la
 // URL. Se lee antes de crear el cliente, que también procesa la URL al
@@ -259,6 +260,7 @@ export default function App() {
   return (
     <main>
       <h1>Portal de BlackMouth</h1>
+      <HelloPage />
       {session === null && mode === "signin" && (
         <>
           <form method="post" onSubmit={(event) => submit(event, signInWith)}>

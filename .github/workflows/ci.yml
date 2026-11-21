@@ -33,6 +33,7 @@ jobs:
         run: |
           deno check --no-lock --config supabase/functions/verify-access/deno.json supabase/functions/verify-access/index.ts
           deno check --no-lock --config supabase/functions/delete-account/deno.json supabase/functions/delete-account/index.ts
+          deno check --no-lock --config supabase/functions/api/deno.json supabase/functions/api/index.ts
           deno lint --config supabase/functions/deno.json supabase/functions
           deno fmt --check --config supabase/functions/deno.json supabase/functions
 
