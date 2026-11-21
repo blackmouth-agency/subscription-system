@@ -26,27 +26,34 @@ async function signInNewUser(isAdmin: boolean) {
   return data.session!.access_token;
 }
 
-function call(token: string, body?: unknown) {
-  return fetch(`${Deno.env.get("FUNCTIONS_URL")!}/api/products`, {
-    method: body === undefined ? "GET" : "POST",
-    headers: {
-      apikey: publishableKey,
-      authorization: `Bearer ${token}`,
-      "content-type": "application/json",
-    },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+const apiRoot = `${Deno.env.get("FUNCTIONS_URL")!}/api`;
+
+function callApi(resource: string) {
+  return (token: string, method: string, path = "", body?: unknown) =>
+    fetch(`${apiRoot}/${resource}${path}`, {
+      method,
+      headers: {
+        apikey: publishableKey,
+        authorization: `Bearer ${token}`,
+        "content-type": "application/json",
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
 }
+
+const callProducts = callApi("products");
+const callClients = callApi("clients");
+const callPartners = callApi("partners");
 
 Deno.test("un admin crea un producto y lo lista", async () => {
   const token = await signInNewUser(true);
   const name = `Hosting ${crypto.randomUUID()}`;
 
-  const created = await call(token, { name, price: 50000 });
+  const created = await callProducts(token, "POST", "", { name, price: 50000 });
   assertEquals(created.status, 201);
   assertEquals((await created.json()).name, name);
 
-  const list = await (await call(token)).json();
+  const list = await (await callProducts(token, "GET")).json();
   assertEquals(list.some((p: { name: string }) => p.name === name), true);
 });
 
@@ -60,37 +67,11 @@ Deno.test("rechaza datos inválidos con 400", async () => {
       { name: "x", description: "d".repeat(501), price: 1000 },
     ]
   ) {
-    const res = await call(token, body);
+    const res = await callProducts(token, "POST", "", body);
     assertEquals(res.status, 400);
     await res.body?.cancel();
   }
 });
-
-Deno.test("sin rol admin responde 403 Sin acceso", async () => {
-  const token = await signInNewUser(false);
-  for (const body of [undefined, { name: "x", price: 1000 }]) {
-    const res = await call(token, body);
-    assertEquals(res.status, 403);
-    assertEquals((await res.json()).message, "Sin acceso");
-  }
-});
-
-function callClients(
-  token: string,
-  method: string,
-  path = "",
-  body?: unknown,
-) {
-  return fetch(`${Deno.env.get("FUNCTIONS_URL")!}/api/clients${path}`, {
-    method,
-    headers: {
-      apikey: publishableKey,
-      authorization: `Bearer ${token}`,
-      "content-type": "application/json",
-    },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-}
 
 Deno.test("un admin crea, edita parcialmente y lista clientes", async () => {
   const token = await signInNewUser(true);
@@ -132,39 +113,6 @@ Deno.test("clientes: datos inválidos 400 y id inexistente 404", async () => {
   assertEquals(missing.status, 404);
   await missing.body?.cancel();
 });
-
-Deno.test("clientes: sin rol admin responde 403 Sin acceso", async () => {
-  const token = await signInNewUser(false);
-  const id = crypto.randomUUID();
-  for (
-    const [method, path, body] of [
-      ["GET", "", undefined],
-      ["POST", "", { name: "x" }],
-      ["PATCH", `/${id}`, { name: "x" }],
-    ] as const
-  ) {
-    const res = await callClients(token, method, path, body);
-    assertEquals(res.status, 403);
-    assertEquals((await res.json()).message, "Sin acceso");
-  }
-});
-
-function callPartners(
-  token: string,
-  method: string,
-  path = "",
-  body?: unknown,
-) {
-  return fetch(`${Deno.env.get("FUNCTIONS_URL")!}/api/partners${path}`, {
-    method,
-    headers: {
-      apikey: publishableKey,
-      authorization: `Bearer ${token}`,
-      "content-type": "application/json",
-    },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-}
 
 Deno.test("un admin crea, desactiva y lista socios", async () => {
   const token = await signInNewUser(true);
@@ -213,18 +161,25 @@ Deno.test("socios: datos inválidos 400 y id inexistente 404", async () => {
   await missing.body?.cancel();
 });
 
-Deno.test("socios: sin rol admin responde 403 Sin acceso", async () => {
-  const token = await signInNewUser(false);
-  const id = crypto.randomUUID();
-  for (
-    const [method, path, body] of [
-      ["GET", "", undefined],
-      ["POST", "", { name: "x" }],
-      ["PATCH", `/${id}`, { name: "x" }],
-    ] as const
-  ) {
-    const res = await callPartners(token, method, path, body);
-    assertEquals(res.status, 403);
-    assertEquals((await res.json()).message, "Sin acceso");
-  }
-});
+const resources = [
+  ["products", callProducts, { name: "x", price: 1000 }, false],
+  ["clients", callClients, { name: "x" }, true],
+  ["partners", callPartners, { name: "x" }, true],
+] as const;
+
+for (const [resource, callResource, body, hasPatch] of resources) {
+  Deno.test(`${resource}: sin rol admin responde 403 Sin acceso`, async () => {
+    const token = await signInNewUser(false);
+    const id = crypto.randomUUID();
+    const requests: [string, string, unknown?][] = [
+      ["GET", ""],
+      ["POST", "", body],
+    ];
+    if (hasPatch) requests.push(["PATCH", `/${id}`, { name: "x" }]);
+    for (const [method, path, payload] of requests) {
+      const res = await callResource(token, method, path, payload);
+      assertEquals(res.status, 403);
+      assertEquals((await res.json()).message, "Sin acceso");
+    }
+  });
+}
