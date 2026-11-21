@@ -1,11 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import {
-  authHeaders,
-  partnerId,
-  createPartnerBody,
-  updatePartnerBody,
-} from "./schemas.ts";
+import { authHeaders, idParam } from "../../shared/schemas.ts";
+import { createPartnerBody, updatePartnerBody } from "./schemas.ts";
 import {
   authorizeAndCreate,
   authorizeAndList,
@@ -32,7 +28,7 @@ export const partners = new Hono()
   .patch(
     "/:id",
     headers,
-    zValidator("param", partnerId),
+    zValidator("param", idParam),
     zValidator("json", updatePartnerBody),
     authorizeAndUpdate,
     ...factory.createHandlers((c) => c.json(c.var.partner)),

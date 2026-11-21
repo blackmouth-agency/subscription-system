@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { authHeaders, createProduct } from "./schemas.ts";
+import { authHeaders } from "../../shared/schemas.ts";
+import { createProduct } from "./schemas.ts";
 import { authorizeAndCreate, authorizeAndList, factory } from "./service.ts";
 
 const headers = zValidator("header", authHeaders);
