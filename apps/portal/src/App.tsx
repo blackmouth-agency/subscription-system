@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { createClient, type Session } from "@supabase/supabase-js";
+import ClientsPage from "./pages/ClientsPage";
 import ProductsPage from "./pages/ProductsPage";
 import AdminTemplate from "./templates/AdminTemplate";
 
@@ -385,6 +386,9 @@ export default function App() {
         <AdminTemplate>
           {window.location.pathname === "/admin/products" && (
             <ProductsPage accessToken={session.access_token} />
+          )}
+          {window.location.pathname === "/admin/clients" && (
+            <ClientsPage accessToken={session.access_token} />
           )}
         </AdminTemplate>
       )}

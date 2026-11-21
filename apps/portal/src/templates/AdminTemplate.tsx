@@ -6,6 +6,7 @@ export default function AdminTemplate({ children }: { children?: ReactNode }) {
       <h2>Administración</h2>
       <nav>
         <a href="/admin/products">Productos</a>
+        <a href="/admin/clients">Clientes</a>
       </nav>
       {children}
     </section>
