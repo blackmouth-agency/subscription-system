@@ -12,7 +12,7 @@ export default function ProductForm({
   onSubmit,
   error,
 }: {
-  onSubmit: (product: NewProduct) => Promise<void>;
+  onSubmit: (product: NewProduct) => Promise<boolean>;
   error: string;
 }) {
   const {
@@ -26,8 +26,7 @@ export default function ProductForm({
     <form
       method="post"
       onSubmit={handleSubmit(async (product) => {
-        await onSubmit(product);
-        reset();
+        if (await onSubmit(product)) reset();
       })}
     >
       <FormField
