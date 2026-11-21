@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { createClient, type Session } from "@supabase/supabase-js";
 import HelloPage from "./pages/HelloPage";
+import AdminTemplate from "./templates/AdminTemplate";
 
 // Un enlace de correo vencido o ya usado vuelve al portal con el error en la
 // URL. Se lee antes de crear el cliente, que también procesa la URL al
@@ -243,6 +244,22 @@ export default function App() {
     return () => data.subscription.unsubscribe();
   }, []);
 
+  // undefined mientras se consulta el rol. El rol vive en la base de datos:
+  // se pregunta en cada sesión nueva.
+  const [adminCheck, setAdminCheck] = useState<{
+    userId: string;
+    isAdmin: boolean;
+  }>();
+  const userId = session?.user.id;
+  const isAdmin =
+    adminCheck?.userId === userId ? adminCheck?.isAdmin : undefined;
+  useEffect(() => {
+    if (!userId) return;
+    supabase
+      .rpc("is_admin")
+      .then(({ data }) => setAdminCheck({ userId, isAdmin: data === true }));
+  }, [userId]);
+
   async function submit(
     event: FormEvent<HTMLFormElement>,
     send: (form: FormData) => Promise<string>,
@@ -365,6 +382,8 @@ export default function App() {
           ? `Entraste como ${session.user.email}`
           : message}
       </p>
+      {session && !recovering && isAdmin === true && <AdminTemplate />}
+      {session && !recovering && isAdmin === false && <p>Sin acceso</p>}
       {session && !recovering && (
         <>
           <button type="button" onClick={() => setShowProfile(true)}>

@@ -3,6 +3,8 @@
   "private": true,
   "devDependencies": {
     "@playwright/test": "^1.65.1",
-    "@supabase/supabase-js": "^2.119.0"
+    "@supabase/supabase-js": "^2.119.0",
+    "@types/pg": "^8.23.1",
+    "pg": "^8.23.1"
   }
 }

@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(23);
+select plan(26);
 
 select is_empty(
   $$ select c.relname::text
@@ -22,6 +22,13 @@ select table_privs_are('public', 'document_acceptances', 'anon', array[]::text[]
   'anon no tiene permisos sobre document_acceptances');
 select table_privs_are('public', 'profiles', 'anon', array[]::text[],
   'anon no tiene permisos sobre profiles');
+
+select table_privs_are('public', 'admins', 'anon', array[]::text[],
+  'anon no tiene permisos sobre admins');
+select table_privs_are('public', 'admins', 'authenticated', array['SELECT'],
+  'authenticated solo puede leer admins');
+select table_privs_are('public', 'admins', 'service_role', array[]::text[],
+  'service_role no tiene permisos sobre admins');
 
 select table_privs_are('public', 'projects', 'authenticated', array['SELECT'],
   'authenticated solo puede leer projects');
