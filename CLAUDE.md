@@ -39,7 +39,7 @@
 - Pages: importan un template y contienen la lógica de datos (qué se trae del backend y qué se envía). Los `handleSubmit` (y demás callbacks) se crean en la page y se pasan por props hasta el organismo.
 - Un organismo no llama al backend ni a `supabase-js`; solo recibe datos y callbacks por props.
 - Código en inglés; solo el texto visible al usuario va en español.
-- Líneas de máximo 80 caracteres, comentarios y textos incluidos (`npm run lint -w portal`, regla `@stylistic/max-len`).
+- Líneas de máximo 80 caracteres, comentarios y textos incluidos (`npm run lint -w portal`, regla `@stylistic/max-len`). Formato con Prettier: `npm run format -w portal`.
 
 ## Historias del MVP
 - `docs/stories.md` lista las historias en orden; se implementa una a la vez, sin saltarse ninguna. Se apoya en `docs/specs.md` y `docs/qa.md`: las marcadas con ⚠ dependen de una pregunta abierta de `qa.md`.

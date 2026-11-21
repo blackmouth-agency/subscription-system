@@ -93,13 +93,11 @@ function MyProfile({ userId, email }: { userId: string; email: string }) {
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const { error } = await supabase
-      .from("profiles")
-      .upsert({
-        user_id: userId,
-        full_name: String(form.get("full_name")),
-        phone: String(form.get("phone")),
-      });
+    const { error } = await supabase.from("profiles").upsert({
+      user_id: userId,
+      full_name: String(form.get("full_name")),
+      phone: String(form.get("phone")),
+    });
     // El servidor valida el perfil; el aviso sale de la regla que rechazó el
     // cambio.
     if (error?.message.includes("profiles_full_name_check"))

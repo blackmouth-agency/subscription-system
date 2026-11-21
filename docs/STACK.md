@@ -15,6 +15,7 @@ Principio: el MVP es una herramienta administrativa con pocos usuarios y casi to
 | `@supabase/supabase-js` | 2.119 (última: 2.119.2) | En uso |
 | `oxlint` | 1.94.0 | En uso |
 | `@stylistic/eslint-plugin` | 6.0.1 | En uso; regla `max-len` de 80 caracteres, cargada como JS plugin (alpha) de oxlint |
+| `prettier` | 3.10.1 | En uso; `printWidth: 80`, `npm run format` y `format:check` en CI |
 | CSS propio (`App.css`, `index.css`) | — | En uso |
 | `react-router` | 8.5.2 | Se agrega en la historia 3, solo con rutas en el cliente |
 | Tipos de la base (`supabase gen types typescript`) | CLI 3.2.0 | Se agregan con la primera tabla del MVP |
