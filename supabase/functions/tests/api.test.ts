@@ -148,3 +148,83 @@ Deno.test("clientes: sin rol admin responde 403 Sin acceso", async () => {
     assertEquals((await res.json()).message, "Sin acceso");
   }
 });
+
+function callPartners(
+  token: string,
+  method: string,
+  path = "",
+  body?: unknown,
+) {
+  return fetch(`${Deno.env.get("FUNCTIONS_URL")!}/api/partners${path}`, {
+    method,
+    headers: {
+      apikey: publishableKey,
+      authorization: `Bearer ${token}`,
+      "content-type": "application/json",
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+}
+
+Deno.test("un admin crea, desactiva y lista socios", async () => {
+  const token = await signInNewUser(true);
+  const name = `Socio ${crypto.randomUUID()}`;
+
+  const created = await callPartners(token, "POST", "", {
+    name,
+    receiving_account: "Bancolombia 123",
+  });
+  assertEquals(created.status, 201);
+  const partner = await created.json();
+  assertEquals(partner.is_active, true);
+
+  const patched = await callPartners(token, "PATCH", `/${partner.id}`, {
+    is_active: false,
+  });
+  assertEquals(patched.status, 200);
+  const updated = await patched.json();
+  assertEquals(updated.is_active, false);
+  assertEquals(updated.receiving_account, "Bancolombia 123");
+
+  const list = await (await callPartners(token, "GET")).json();
+  assertEquals(list.some((p: { name: string }) => p.name === name), true);
+});
+
+Deno.test("socios: datos inválidos 400 y id inexistente 404", async () => {
+  const token = await signInNewUser(true);
+  for (
+    const body of [
+      { name: " " },
+      { name: "x", email: "no-es-correo" },
+      { name: "x", receiving_account: "c".repeat(201) },
+    ]
+  ) {
+    const res = await callPartners(token, "POST", "", body);
+    assertEquals(res.status, 400);
+    await res.body?.cancel();
+  }
+  const missingId = `/${crypto.randomUUID()}`;
+  const empty = await callPartners(token, "PATCH", missingId, {});
+  assertEquals(empty.status, 400);
+  await empty.body?.cancel();
+
+  const missing = await callPartners(token, "PATCH", missingId, { name: "x" });
+  assertEquals(missing.status, 404);
+  await missing.body?.cancel();
+});
+
+Deno.test("socios: sin rol admin responde 403 Sin acceso", async () => {
+  const token = await signInNewUser(false);
+  const id = crypto.randomUUID();
+  for (
+    const [method, path, body] of [
+      ["GET", "", undefined],
+      ["POST", "", { name: "x" }],
+      ["PATCH", `/${id}`, { name: "x" }],
+    ] as const
+  ) {
+    const res = await callPartners(token, method, path, body);
+    assertEquals(res.status, 403);
+    assertEquals((await res.json()).message, "Sin acceso");
+  }
+});
