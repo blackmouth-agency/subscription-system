@@ -1,4 +1,6 @@
 import { useForm } from "react-hook-form";
+import { maxLength, trim } from "../forms";
+import FormField from "../molecules/FormField";
 
 export type ClientData = {
   name: string;
@@ -25,7 +27,6 @@ export default function ClientForm({
     reset,
     formState: { errors, isSubmitting },
   } = useForm<ClientData>({ defaultValues: client });
-  const trim = (value: string) => value.trim();
 
   return (
     <form
@@ -34,42 +35,39 @@ export default function ClientForm({
         if (await onSubmit(data)) reset();
       })}
     >
-      <label htmlFor="client-name">Nombre o razón social</label>
-      <input
+      <FormField
         id="client-name"
+        label="Nombre o razón social"
+        error={errors.name?.message}
         {...register("name", {
           setValueAs: trim,
           required: "Escribe el nombre.",
-          maxLength: { value: 100, message: "Máximo 100 caracteres." },
+          maxLength: maxLength(100),
         })}
       />
-      <span role="alert">{errors.name?.message}</span>
-      <label htmlFor="client-contact">Contacto</label>
-      <input
+      <FormField
         id="client-contact"
+        label="Contacto"
+        error={errors.contact_name?.message}
         {...register("contact_name", {
           setValueAs: trim,
-          maxLength: { value: 100, message: "Máximo 100 caracteres." },
+          maxLength: maxLength(100),
         })}
       />
-      <span role="alert">{errors.contact_name?.message}</span>
-      <label htmlFor="client-email">Correo</label>
-      <input
+      <FormField
         id="client-email"
+        label="Correo"
         type="email"
+        error={errors.email?.message}
         {...register("email", { setValueAs: trim })}
       />
-      <span role="alert">{errors.email?.message}</span>
-      <label htmlFor="client-phone">Teléfono / WhatsApp</label>
-      <input
+      <FormField
         id="client-phone"
+        label="Teléfono / WhatsApp"
         type="tel"
-        {...register("phone", {
-          setValueAs: trim,
-          maxLength: { value: 30, message: "Máximo 30 caracteres." },
-        })}
+        error={errors.phone?.message}
+        {...register("phone", { setValueAs: trim, maxLength: maxLength(30) })}
       />
-      <span role="alert">{errors.phone?.message}</span>
       <button type="submit" disabled={isSubmitting}>
         {client ? "Guardar cliente" : "Crear cliente"}
       </button>
