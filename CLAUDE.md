@@ -46,3 +46,6 @@
 
 ## Commits
 - Conventional Commits en español, con `/sncommit`.
+- Una rama por historia: se crea al empezarla, los commits van ahí y al terminarla se abre un PR a `main`.
+- Commit, push y PR solo cuando se indiquen. Nunca force push a `main`.
+- Sin línea `Co-Authored-By` de Claude en los commits.
