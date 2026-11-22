@@ -20,7 +20,8 @@ type Subscription = {
 export const service = crudService<Subscription>({
   table: "subscriptions",
   notFound: "Suscripción no encontrada",
-  select: "*, client:clients(name), product:products(name), partner:partners(name)",
+  select:
+    "*, client:clients(name), product:products(name), partner:partners(name)",
   order: ["created_at", false],
   filters: ["client_id"],
   fkNotFound: {
