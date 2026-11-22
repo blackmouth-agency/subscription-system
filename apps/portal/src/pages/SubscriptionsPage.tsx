@@ -1,3 +1,5 @@
+import { useMemo, useState } from "react";
+import { createApi } from "../api";
 import { useAdminResource } from "../hooks/useAdminResource";
 import type { Client } from "../organisms/ClientTable";
 import type { Partner } from "../organisms/PartnerTable";
@@ -5,6 +7,9 @@ import type { Product } from "../organisms/ProductTable";
 import SubscriptionForm, {
   type NewSubscription,
 } from "../organisms/SubscriptionForm";
+import SubscriptionHistory, {
+  type HistoryEntry,
+} from "../organisms/SubscriptionHistory";
 import SubscriptionTable, {
   type Subscription,
 } from "../organisms/SubscriptionTable";
@@ -33,6 +38,20 @@ export default function SubscriptionsPage({
     },
     newestFirst,
   );
+  const api = useMemo(() => createApi(accessToken), [accessToken]);
+  const [history, setHistory] = useState<HistoryEntry[]>();
+  const [historyError, setHistoryError] = useState("");
+  async function showHistory({ id }: Subscription) {
+    try {
+      const { data } = await api.get<HistoryEntry[]>(
+        `/subscriptions/${id}/history`,
+      );
+      setHistory(data);
+      setHistoryError("");
+    } catch {
+      setHistoryError("No pudimos cargar el historial.");
+    }
+  }
   const { rows: clients } = useAdminResource<Client, never>(
     "/clients",
     accessToken,
@@ -67,11 +86,21 @@ export default function SubscriptionsPage({
         />
       }
       table={
-        <SubscriptionTable
-          subscriptions={rows}
-          onEdit={setEditing}
-          onChangeStatus={(id, status) => act(id, "status", { status })}
-        />
+        <>
+          <SubscriptionTable
+            subscriptions={rows}
+            onEdit={setEditing}
+            onChangeStatus={(id, status) => act(id, "status", { status })}
+            onShowHistory={showHistory}
+          />
+          {historyError && <p role="alert">{historyError}</p>}
+          {history && (
+            <SubscriptionHistory
+              entries={history}
+              onClose={() => setHistory(undefined)}
+            />
+          )}
+        </>
       }
     />
   );

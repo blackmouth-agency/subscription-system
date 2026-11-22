@@ -70,4 +70,30 @@ const authorizeAndChangeStatus = statusFactory.createMiddleware(
   },
 );
 
-export const service = { ...crud, authorizeAndChangeStatus, statusFactory };
+const historyFactory = createFactory<{ Variables: { history: unknown[] } }>();
+
+const authorizeAndListHistory = historyFactory.createMiddleware(
+  async (c, next) => {
+    const { authorization, apikey } = c.req.valid("header" as never);
+    const { id } = c.req.valid("param" as never);
+    const db = await adminDb(authorization, apikey);
+    const { data: exists } = await db.from("subscriptions").select("id")
+      .eq("id", id);
+    if (!exists?.length) {
+      throw new HTTPException(404, { message: "Suscripción no encontrada" });
+    }
+    const { data, error } = await db.from("subscription_history").select("*")
+      .eq("subscription_id", id).order("changed_at", { ascending: false });
+    if (error) throw new HTTPException(500, { message: "Error interno." });
+    c.set("history", data);
+    await next();
+  },
+);
+
+export const service = {
+  ...crud,
+  authorizeAndChangeStatus,
+  statusFactory,
+  authorizeAndListHistory,
+  historyFactory,
+};
