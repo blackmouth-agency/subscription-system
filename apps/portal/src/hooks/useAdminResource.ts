@@ -50,5 +50,16 @@ export function useAdminResource<T extends Row, Body>(
     }
   }
 
-  return { rows, editing, setEditing, save, error };
+  // `POST path/:id/action`: la API devuelve la fila actualizada.
+  async function act(id: string, action: string, body: object) {
+    try {
+      const { data } = await api.post<T>(`${path}/${id}/${action}`, body);
+      setRows((current) => current.map((r) => (r.id === data.id ? data : r)));
+      setError("");
+    } catch {
+      setError(saveError);
+    }
+  }
+
+  return { rows, editing, setEditing, save, act, error };
 }

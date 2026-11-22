@@ -36,3 +36,7 @@ export const updateSubscription = updateBody(partnerFields)
 export const listSubscriptions = z.object({
   client_id: z.string().uuid().optional(),
 });
+
+export const changeStatus = z.object({
+  status: z.enum(["active", "suspended", "cancelled"]),
+});
