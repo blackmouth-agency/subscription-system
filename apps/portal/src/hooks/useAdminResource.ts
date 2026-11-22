@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { createApi } from "../api";
 
-type Row = { id: string; name: string };
+type Row = { id: string };
 
-const byName = (a: Row, b: Row) => a.name.localeCompare(b.name);
+const byName = (a: { name: string }, b: { name: string }) =>
+  a.name.localeCompare(b.name);
 
 // Datos de una página admin: lista `GET path`, crea con `POST path` o, si hay
 // una fila en `editing`, la edita con `PATCH path/:id`. `save` devuelve true
@@ -12,6 +13,8 @@ export function useAdminResource<T extends Row, Body>(
   path: string,
   accessToken: string,
   messages: { loadError: string; saveError: string },
+  // Sin `name` (p. ej. suscripciones) hay que pasar el orden.
+  compare: (a: T, b: T) => number = byName as never,
 ) {
   const [rows, setRows] = useState<T[]>([]);
   const [editing, setEditing] = useState<T>();
@@ -32,12 +35,12 @@ export function useAdminResource<T extends Row, Body>(
       if (editing) {
         const { data } = await api.patch<T>(`${path}/${editing.id}`, body);
         setRows((current) =>
-          current.map((r) => (r.id === data.id ? data : r)).sort(byName),
+          current.map((r) => (r.id === data.id ? data : r)).sort(compare),
         );
         setEditing(undefined);
       } else {
         const { data } = await api.post<T>(path, body);
-        setRows((current) => [...current, data].sort(byName));
+        setRows((current) => [...current, data].sort(compare));
       }
       setError("");
       return true;

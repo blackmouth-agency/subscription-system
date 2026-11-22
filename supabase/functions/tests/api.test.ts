@@ -44,6 +44,7 @@ function callApi(resource: string) {
 const callProducts = callApi("products");
 const callClients = callApi("clients");
 const callPartners = callApi("partners");
+const callSubscriptions = callApi("subscriptions");
 
 Deno.test("un admin crea un producto y lo lista", async () => {
   const token = await signInNewUser(true);
@@ -161,10 +162,92 @@ Deno.test("socios: datos inválidos 400 y id inexistente 404", async () => {
   await missing.body?.cancel();
 });
 
+Deno.test("un admin crea suscripciones y las filtra por cliente", async () => {
+  const token = await signInNewUser(true);
+  const client = await (await callClients(token, "POST", "", { name: "A" }))
+    .json();
+  const other = await (await callClients(token, "POST", "", { name: "B" }))
+    .json();
+  const product = await (await callProducts(token, "POST", "", {
+    name: "P",
+    price: 50000,
+  })).json();
+  const body = { client_id: client.id, product_id: product.id };
+
+  const created = await callSubscriptions(token, "POST", "", {
+    ...body,
+    price: 45000,
+  });
+  assertEquals(created.status, 201);
+  const row = await created.json();
+  assertEquals(
+    [row.price, row.status, row.commission, row.receiver, row.client.name],
+    [45000, "pending", 0, "agency", "A"],
+  );
+  assertEquals(row.cycle_date, new Date().toLocaleDateString("sv"));
+  await (await callSubscriptions(token, "POST", "", {
+    client_id: other.id,
+    product_id: product.id,
+    price: 1000,
+  })).body?.cancel();
+
+  const list = await (await callSubscriptions(
+    token,
+    "GET",
+    `?client_id=${client.id}`,
+  )).json();
+  assertEquals(list.map((s: { id: string }) => s.id), [row.id]);
+});
+
+Deno.test("suscripciones: datos inválidos 400 e inexistentes 404", async () => {
+  const token = await signInNewUser(true);
+  const client = await (await callClients(token, "POST", "", { name: "A" }))
+    .json();
+  const product = await (await callProducts(token, "POST", "", {
+    name: "P",
+    price: 50000,
+  })).json();
+  const valid = { client_id: client.id, product_id: product.id, price: 1000 };
+
+  for (
+    const body of [
+      { ...valid, price: 0 },
+      { ...valid, price: 10.5 },
+      { ...valid, client_id: "no-uuid" },
+      { ...valid, cycle_date: "ayer" },
+    ]
+  ) {
+    const res = await callSubscriptions(token, "POST", "", body);
+    assertEquals(res.status, 400);
+    await res.body?.cancel();
+  }
+  const badFilter = await callSubscriptions(token, "GET", "?client_id=x");
+  assertEquals(badFilter.status, 400);
+  await badFilter.body?.cancel();
+
+  const noClient = await callSubscriptions(token, "POST", "", {
+    ...valid,
+    client_id: crypto.randomUUID(),
+  });
+  assertEquals(noClient.status, 404);
+  assertEquals((await noClient.json()).message, "Cliente no encontrado");
+  const noProduct = await callSubscriptions(token, "POST", "", {
+    ...valid,
+    product_id: crypto.randomUUID(),
+  });
+  assertEquals(noProduct.status, 404);
+  assertEquals((await noProduct.json()).message, "Producto no encontrado");
+});
+
 const resources = [
   ["products", callProducts, { name: "x", price: 1000 }, false],
   ["clients", callClients, { name: "x" }, true],
   ["partners", callPartners, { name: "x" }, true],
+  ["subscriptions", callSubscriptions, {
+    client_id: crypto.randomUUID(),
+    product_id: crypto.randomUUID(),
+    price: 1000,
+  }, false],
 ] as const;
 
 for (const [resource, callResource, body, hasPatch] of resources) {
