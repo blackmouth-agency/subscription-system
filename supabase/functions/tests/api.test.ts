@@ -239,18 +239,122 @@ Deno.test("suscripciones: datos inválidos 400 e inexistentes 404", async () => 
   assertEquals((await noProduct.json()).message, "Producto no encontrado");
 });
 
+Deno.test("suscripciones: asigna socio, edita y vuelve a venta directa", async () => {
+  const token = await signInNewUser(true);
+  const client = await (await callClients(token, "POST", "", { name: "A" }))
+    .json();
+  const product = await (await callProducts(token, "POST", "", {
+    name: "P",
+    price: 50000,
+  })).json();
+  const partner = await (await callPartners(token, "POST", "", { name: "S" }))
+    .json();
+  const inactive = await (await callPartners(token, "POST", "", {
+    name: "I",
+    is_active: false,
+  })).json();
+  const base = { client_id: client.id, product_id: product.id, price: 50000 };
+  const terms = {
+    partner_id: partner.id,
+    commission: 5000,
+    commission_type: "months",
+    commission_months: 3,
+    receiver: "partner",
+  };
+
+  const created = await callSubscriptions(token, "POST", "", {
+    ...base,
+    ...terms,
+  });
+  assertEquals(created.status, 201);
+  const row = await created.json();
+  assertEquals(
+    [row.partner.name, row.commission, row.commission_months, row.receiver],
+    ["S", 5000, 3, "partner"],
+  );
+
+  // Cambiar a `once` borra la cantidad de mensualidades.
+  const once = await callSubscriptions(token, "PATCH", `/${row.id}`, {
+    commission_type: "once",
+  });
+  assertEquals(once.status, 200);
+  const onceRow = await once.json();
+  assertEquals(
+    [onceRow.commission_type, onceRow.commission_months, onceRow.price],
+    ["once", null, 50000],
+  );
+
+  const direct = await callSubscriptions(token, "PATCH", `/${row.id}`, {
+    partner_id: null,
+    commission: 0,
+    receiver: "agency",
+  });
+  assertEquals(direct.status, 200);
+  assertEquals((await direct.json()).partner, null);
+
+  const calls: [string, string, unknown, number, string?][] = [
+    [
+      "POST",
+      "",
+      { ...base, ...terms, partner_id: crypto.randomUUID() },
+      404,
+      "Socio no encontrado",
+    ],
+    [
+      "POST",
+      "",
+      { ...base, ...terms, partner_id: inactive.id },
+      409,
+      "El socio está inactivo",
+    ],
+    [
+      "PATCH",
+      `/${row.id}`,
+      { partner_id: inactive.id },
+      409,
+      "El socio está inactivo",
+    ],
+    [
+      "PATCH",
+      `/${row.id}`,
+      { partner_id: crypto.randomUUID() },
+      404,
+      "Socio no encontrado",
+    ],
+    [
+      "PATCH",
+      `/${crypto.randomUUID()}`,
+      { commission: 1 },
+      404,
+      "Suscripción no encontrada",
+    ],
+    ["PATCH", `/${row.id}`, { commission: 60000 }, 400],
+    ["PATCH", `/${row.id}`, { receiver: "partner" }, 400],
+    ["PATCH", `/${row.id}`, { commission_months: 2 }, 400],
+    ["PATCH", `/${row.id}`, { commission: -1 }, 400],
+    ["PATCH", `/${row.id}`, { price: 1 }, 400],
+    ["POST", "", { ...base, commission_months: 2 }, 400],
+  ];
+  for (const [method, path, body, status, message] of calls) {
+    const res = await callSubscriptions(token, method, path, body);
+    assertEquals(res.status, status, JSON.stringify(body));
+    if (message) assertEquals((await res.json()).message, message);
+    else await res.body?.cancel();
+  }
+});
+
 const resources = [
-  ["products", callProducts, { name: "x", price: 1000 }, false],
-  ["clients", callClients, { name: "x" }, true],
-  ["partners", callPartners, { name: "x" }, true],
+  ["products", callProducts, { name: "x", price: 1000 }, undefined],
+  ["clients", callClients, { name: "x" }, { name: "x" }],
+  ["partners", callPartners, { name: "x" }, { name: "x" }],
   ["subscriptions", callSubscriptions, {
     client_id: crypto.randomUUID(),
     product_id: crypto.randomUUID(),
     price: 1000,
-  }, false],
+  }, { commission: 0 }],
 ] as const;
 
-for (const [resource, callResource, body, hasPatch] of resources) {
+for (const [resource, callResource, body, patch] of resources) {
   Deno.test(`${resource}: sin rol admin responde 403 Sin acceso`, async () => {
     const token = await signInNewUser(false);
     const id = crypto.randomUUID();
@@ -258,7 +362,7 @@ for (const [resource, callResource, body, hasPatch] of resources) {
       ["GET", ""],
       ["POST", "", body],
     ];
-    if (hasPatch) requests.push(["PATCH", `/${id}`, { name: "x" }]);
+    if (patch) requests.push(["PATCH", `/${id}`, patch]);
     for (const [method, path, payload] of requests) {
       const res = await callResource(token, method, path, payload);
       assertEquals(res.status, 403);

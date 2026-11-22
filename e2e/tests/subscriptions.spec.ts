@@ -43,3 +43,49 @@ test("una cuenta sin el rol ve sin acceso", async ({ page }) => {
   await expect(page.getByText("Sin acceso")).toBeVisible();
   await expect(page.getByRole("table")).toHaveCount(0);
 });
+
+test("el admin asigna un socio con comisión y lo edita", async ({ page }) => {
+  await signInAt(page, await createUser(true), "/admin/partners");
+  const partner = `Socio ${crypto.randomUUID()}`;
+  await page.getByLabel("Nombre o razón social").fill(partner);
+  await page.getByRole("button", { name: "Crear socio" }).click();
+  await expect(page.getByRole("row", { name: new RegExp(partner) }))
+    .toBeVisible();
+
+  await page.goto("/admin/clients");
+  const client = `Acme ${crypto.randomUUID()}`;
+  await page.getByLabel("Nombre o razón social").fill(client);
+  await page.getByRole("button", { name: "Crear cliente" }).click();
+  await expect(page.getByRole("row", { name: new RegExp(client) }))
+    .toBeVisible();
+
+  await page.goto("/admin/products");
+  const product = `Hosting ${crypto.randomUUID()}`;
+  await page.getByLabel("Nombre", { exact: true }).fill(product);
+  await page.getByLabel("Precio (COP)").fill("50000");
+  await page.getByRole("button", { name: "Crear producto" }).click();
+  await expect(page.getByRole("row", { name: new RegExp(product) }))
+    .toBeVisible();
+
+  await page.goto("/admin/subscriptions");
+  await page.getByLabel("Cliente").selectOption({ label: client });
+  await page.getByLabel("Producto").selectOption({ label: product });
+  await page.getByLabel("Socio").selectOption({ label: partner });
+  await page.getByLabel("Comisión (COP)").fill("5000");
+  await page.getByLabel("Duración").selectOption("months");
+  await page.getByLabel("Mensualidades").fill("3");
+  await page.getByLabel("Receptor").selectOption("partner");
+  await page.getByRole("button", { name: "Crear suscripción" }).click();
+
+  const row = page.getByRole("row", { name: new RegExp(client) });
+  await expect(row).toContainText(partner);
+  await expect(row).toContainText("5.000");
+  await expect(row).toContainText("3 mensualidades");
+  await expect(row).toContainText("Socio");
+
+  await row.getByRole("button", { name: "Editar" }).click();
+  await page.getByLabel("Duración").selectOption("once");
+  await page.getByRole("button", { name: "Guardar suscripción" }).click();
+  await expect(row).toContainText("Única");
+  await expect(row).not.toContainText("3 mensualidades");
+});

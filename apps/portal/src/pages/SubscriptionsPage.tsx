@@ -1,5 +1,6 @@
 import { useAdminResource } from "../hooks/useAdminResource";
 import type { Client } from "../organisms/ClientTable";
+import type { Partner } from "../organisms/PartnerTable";
 import type { Product } from "../organisms/ProductTable";
 import SubscriptionForm, {
   type NewSubscription,
@@ -20,17 +21,25 @@ export default function SubscriptionsPage({
   accessToken: string;
   clientId?: string;
 }) {
-  const { rows, save, error } = useAdminResource<Subscription, NewSubscription>(
+  const { rows, editing, setEditing, save, error } = useAdminResource<
+    Subscription,
+    NewSubscription
+  >(
     clientId ? `/subscriptions?client_id=${clientId}` : "/subscriptions",
     accessToken,
     {
       loadError: "No pudimos cargar las suscripciones.",
-      saveError: "No pudimos crear la suscripción.",
+      saveError: "No pudimos guardar la suscripción.",
     },
     newestFirst,
   );
   const { rows: clients } = useAdminResource<Client, never>(
     "/clients",
+    accessToken,
+    { loadError: "", saveError: "" },
+  );
+  const { rows: partners } = useAdminResource<Partner, never>(
+    "/partners",
     accessToken,
     { loadError: "", saveError: "" },
   );
@@ -44,6 +53,12 @@ export default function SubscriptionsPage({
     <FormTableTemplate
       form={
         <SubscriptionForm
+          key={editing?.id}
+          subscription={editing}
+          onCancel={() => setEditing(undefined)}
+          partners={partners.filter(
+            (p) => p.is_active || p.id === editing?.partner_id,
+          )}
           clients={clients}
           products={products}
           clientId={clientId}
@@ -51,7 +66,7 @@ export default function SubscriptionsPage({
           error={error}
         />
       }
-      table={<SubscriptionTable subscriptions={rows} />}
+      table={<SubscriptionTable subscriptions={rows} onEdit={setEditing} />}
     />
   );
 }
