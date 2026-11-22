@@ -413,6 +413,62 @@ Deno.test("suscripciones: cambia de estado solo por transiciones válidas", asyn
   await forbidden.body?.cancel();
 });
 
+Deno.test("suscripciones: lista el historial de cambios, el más reciente primero", async () => {
+  const token = await signInNewUser(true);
+  const client = await (await callClients(token, "POST", "", { name: "A" }))
+    .json();
+  const product = await (await callProducts(token, "POST", "", {
+    name: "P",
+    price: 50000,
+  })).json();
+  const partner = await (await callPartners(token, "POST", "", { name: "S" }))
+    .json();
+  const sub = await (await callSubscriptions(token, "POST", "", {
+    client_id: client.id,
+    product_id: product.id,
+    price: 50000,
+  })).json();
+  const history = async () =>
+    await (await callSubscriptions(token, "GET", `/${sub.id}/history`)).json();
+
+  assertEquals(await history(), []);
+
+  await (await callSubscriptions(token, "POST", `/${sub.id}/status`, {
+    status: "active",
+  })).body?.cancel();
+  await (await callSubscriptions(token, "PATCH", `/${sub.id}`, {
+    partner_id: partner.id,
+  })).body?.cancel();
+
+  const rows = await history();
+  assertEquals(
+    rows.map((
+      r: { field: string; old_value: string; new_value: string },
+    ) => [r.field, r.old_value, r.new_value]),
+    [["partner_id", "", "S"], ["status", "pending", "active"]],
+  );
+  assertEquals(rows[0].changed_by_email.endsWith("@test.local"), true);
+
+  const missing = await callSubscriptions(
+    token,
+    "GET",
+    `/${crypto.randomUUID()}/history`,
+  );
+  assertEquals(missing.status, 404);
+  assertEquals((await missing.json()).message, "Suscripción no encontrada");
+  const bad = await callSubscriptions(token, "GET", "/no-uuid/history");
+  assertEquals(bad.status, 400);
+  await bad.body?.cancel();
+
+  const forbidden = await callSubscriptions(
+    await signInNewUser(false),
+    "GET",
+    `/${sub.id}/history`,
+  );
+  assertEquals(forbidden.status, 403);
+  await forbidden.body?.cancel();
+});
+
 const resources = [
   ["products", callProducts, { name: "x", price: 1000 }, undefined],
   ["clients", callClients, { name: "x" }, { name: "x" }],

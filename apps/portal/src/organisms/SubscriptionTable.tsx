@@ -1,15 +1,4 @@
-const cop = new Intl.NumberFormat("es-CO", {
-  style: "currency",
-  currency: "COP",
-  maximumFractionDigits: 0,
-});
-
-const statuses: Record<string, string> = {
-  pending: "Pendiente",
-  active: "Activa",
-  suspended: "Suspendida",
-  cancelled: "Cancelada",
-};
+import { cop, receivers, statuses } from "../subscriptionLabels";
 
 // Acciones válidas por estado actual (espejo de la API, que es quien decide).
 const transitions: Record<string, [string, string][]> = {
@@ -26,11 +15,6 @@ const transitions: Record<string, [string, string][]> = {
     ["cancelled", "Cancelar"],
   ],
   cancelled: [],
-};
-
-const receivers: Record<string, string> = {
-  agency: "Agencia",
-  partner: "Socio",
 };
 
 const duration = (s: Subscription) =>
@@ -62,10 +46,12 @@ export default function SubscriptionTable({
   subscriptions,
   onEdit,
   onChangeStatus,
+  onShowHistory,
 }: {
   subscriptions: Subscription[];
   onEdit: (subscription: Subscription) => void;
   onChangeStatus: (id: string, status: string) => void;
+  onShowHistory: (subscription: Subscription) => void;
 }) {
   return (
     <table>
@@ -99,6 +85,9 @@ export default function SubscriptionTable({
             <td>
               <button type="button" onClick={() => onEdit(subscription)}>
                 Editar
+              </button>
+              <button type="button" onClick={() => onShowHistory(subscription)}>
+                Historial
               </button>
               {transitions[subscription.status].map(([status, label]) => (
                 <button

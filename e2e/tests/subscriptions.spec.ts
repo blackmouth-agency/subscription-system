@@ -128,3 +128,38 @@ test("el admin activa, suspende, reactiva y cancela una suscripción", async ({ 
   await expect(row.getByRole("button", { name: "Activar" })).toHaveCount(0);
   await expect(row.getByRole("button", { name: "Cancelar" })).toHaveCount(0);
 });
+
+test("el admin ve el historial de cambios de una suscripción", async ({ page }) => {
+  const email = await createUser(true);
+  await signInAt(page, email, "/admin/clients");
+  const client = `Acme ${crypto.randomUUID()}`;
+  await page.getByLabel("Nombre o razón social").fill(client);
+  await page.getByRole("button", { name: "Crear cliente" }).click();
+  await expect(page.getByRole("row", { name: new RegExp(client) }))
+    .toBeVisible();
+
+  await page.goto("/admin/products");
+  const product = `Hosting ${crypto.randomUUID()}`;
+  await page.getByLabel("Nombre", { exact: true }).fill(product);
+  await page.getByLabel("Precio (COP)").fill("50000");
+  await page.getByRole("button", { name: "Crear producto" }).click();
+  await expect(page.getByRole("row", { name: new RegExp(product) }))
+    .toBeVisible();
+
+  await page.goto("/admin/subscriptions");
+  await page.getByLabel("Cliente").selectOption({ label: client });
+  await page.getByLabel("Producto").selectOption({ label: product });
+  await page.getByRole("button", { name: "Crear suscripción" }).click();
+
+  const row = page.getByRole("row", { name: new RegExp(client) });
+  await row.getByRole("button", { name: "Historial" }).click();
+  await expect(page.getByText("Sin cambios registrados")).toBeVisible();
+
+  await row.getByRole("button", { name: "Activar" }).click();
+  await expect(row).toContainText("Activa");
+  await row.getByRole("button", { name: "Historial" }).click();
+  const entry = page.getByRole("row", { name: new RegExp(`${email}.*Estado`) });
+  await expect(entry).toContainText(email);
+  await expect(entry).toContainText("Pendiente");
+  await expect(entry).toContainText("Activa");
+});

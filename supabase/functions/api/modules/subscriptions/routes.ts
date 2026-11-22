@@ -20,4 +20,10 @@ export const subscriptions = crudRoutes(service, {
   zValidator("json", changeStatus),
   service.authorizeAndChangeStatus,
   ...service.statusFactory.createHandlers((c) => c.json(c.var.row)),
+).get(
+  "/:id/history",
+  zValidator("header", authHeaders),
+  zValidator("param", idParam),
+  service.authorizeAndListHistory,
+  ...service.historyFactory.createHandlers((c) => c.json(c.var.history)),
 );
