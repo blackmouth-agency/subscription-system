@@ -11,6 +11,23 @@ const statuses: Record<string, string> = {
   cancelled: "Cancelada",
 };
 
+// Acciones válidas por estado actual (espejo de la API, que es quien decide).
+const transitions: Record<string, [string, string][]> = {
+  pending: [
+    ["active", "Activar"],
+    ["cancelled", "Cancelar"],
+  ],
+  active: [
+    ["suspended", "Suspender"],
+    ["cancelled", "Cancelar"],
+  ],
+  suspended: [
+    ["active", "Reactivar"],
+    ["cancelled", "Cancelar"],
+  ],
+  cancelled: [],
+};
+
 const receivers: Record<string, string> = {
   agency: "Agencia",
   partner: "Socio",
@@ -44,9 +61,11 @@ export type Subscription = {
 export default function SubscriptionTable({
   subscriptions,
   onEdit,
+  onChangeStatus,
 }: {
   subscriptions: Subscription[];
   onEdit: (subscription: Subscription) => void;
+  onChangeStatus: (id: string, status: string) => void;
 }) {
   return (
     <table>
@@ -81,6 +100,22 @@ export default function SubscriptionTable({
               <button type="button" onClick={() => onEdit(subscription)}>
                 Editar
               </button>
+              {transitions[subscription.status].map(([status, label]) => (
+                <button
+                  key={status}
+                  type="button"
+                  onClick={() => {
+                    if (
+                      status !== "cancelled" ||
+                      window.confirm("¿Cancelar la suscripción?")
+                    ) {
+                      onChangeStatus(subscription.id, status);
+                    }
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
             </td>
           </tr>
         ))}

@@ -21,7 +21,7 @@ export default function SubscriptionsPage({
   accessToken: string;
   clientId?: string;
 }) {
-  const { rows, editing, setEditing, save, error } = useAdminResource<
+  const { rows, editing, setEditing, save, act, error } = useAdminResource<
     Subscription,
     NewSubscription
   >(
@@ -66,7 +66,13 @@ export default function SubscriptionsPage({
           error={error}
         />
       }
-      table={<SubscriptionTable subscriptions={rows} onEdit={setEditing} />}
+      table={
+        <SubscriptionTable
+          subscriptions={rows}
+          onEdit={setEditing}
+          onChangeStatus={(id, status) => act(id, "status", { status })}
+        />
+      }
     />
   );
 }

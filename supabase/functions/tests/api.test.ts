@@ -343,6 +343,76 @@ Deno.test("suscripciones: asigna socio, edita y vuelve a venta directa", async (
   }
 });
 
+Deno.test("suscripciones: cambia de estado solo por transiciones válidas", async () => {
+  const token = await signInNewUser(true);
+  const client = await (await callClients(token, "POST", "", { name: "A" }))
+    .json();
+  const product = await (await callProducts(token, "POST", "", {
+    name: "P",
+    price: 50000,
+  })).json();
+  const create = async () =>
+    (await (await callSubscriptions(token, "POST", "", {
+      client_id: client.id,
+      product_id: product.id,
+      price: 50000,
+    })).json()).id as string;
+  const change = (id: string, status: string) =>
+    callSubscriptions(token, "POST", `/${id}/status`, { status });
+
+  const id = await create();
+  const steps: [string, number, string?][] = [
+    ["suspended", 409, "Transición de estado no permitida"],
+    ["active", 200],
+    ["active", 409, "Transición de estado no permitida"],
+    ["suspended", 200],
+    ["active", 200],
+    ["cancelled", 200],
+    ["active", 409, "Transición de estado no permitida"],
+    ["cancelled", 409, "Transición de estado no permitida"],
+  ];
+  for (const [status, code, message] of steps) {
+    const res = await change(id, status);
+    assertEquals(res.status, code, status);
+    const body = await res.json();
+    if (message) assertEquals(body.message, message);
+    else assertEquals(body.status, status);
+  }
+
+  // Una pendiente se cancela directo.
+  const direct = await change(await create(), "cancelled");
+  assertEquals(direct.status, 200);
+  await direct.body?.cancel();
+
+  for (
+    const [path, body, status, message] of [
+      [
+        `/${crypto.randomUUID()}/status`,
+        { status: "active" },
+        404,
+        "Suscripción no encontrada",
+      ],
+      [`/${id}/status`, { status: "pending" }, 400],
+      [`/${id}/status`, {}, 400],
+      ["/no-uuid/status", { status: "active" }, 400],
+    ] as const
+  ) {
+    const res = await callSubscriptions(token, "POST", path, body);
+    assertEquals(res.status, status, path);
+    if (message) assertEquals((await res.json()).message, message);
+    else await res.body?.cancel();
+  }
+
+  const forbidden = await callSubscriptions(
+    await signInNewUser(false),
+    "POST",
+    `/${id}/status`,
+    { status: "active" },
+  );
+  assertEquals(forbidden.status, 403);
+  await forbidden.body?.cancel();
+});
+
 const resources = [
   ["products", callProducts, { name: "x", price: 1000 }, undefined],
   ["clients", callClients, { name: "x" }, { name: "x" }],

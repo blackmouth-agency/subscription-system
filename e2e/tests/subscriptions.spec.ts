@@ -89,3 +89,42 @@ test("el admin asigna un socio con comisión y lo edita", async ({ page }) => {
   await expect(row).toContainText("Única");
   await expect(row).not.toContainText("3 mensualidades");
 });
+
+test("el admin activa, suspende, reactiva y cancela una suscripción", async ({ page }) => {
+  await signInAt(page, await createUser(true), "/admin/clients");
+  const client = `Acme ${crypto.randomUUID()}`;
+  await page.getByLabel("Nombre o razón social").fill(client);
+  await page.getByRole("button", { name: "Crear cliente" }).click();
+  await expect(page.getByRole("row", { name: new RegExp(client) }))
+    .toBeVisible();
+
+  await page.goto("/admin/products");
+  const product = `Hosting ${crypto.randomUUID()}`;
+  await page.getByLabel("Nombre", { exact: true }).fill(product);
+  await page.getByLabel("Precio (COP)").fill("50000");
+  await page.getByRole("button", { name: "Crear producto" }).click();
+  await expect(page.getByRole("row", { name: new RegExp(product) }))
+    .toBeVisible();
+
+  await page.goto("/admin/subscriptions");
+  await page.getByLabel("Cliente").selectOption({ label: client });
+  await page.getByLabel("Producto").selectOption({ label: product });
+  await page.getByRole("button", { name: "Crear suscripción" }).click();
+
+  const row = page.getByRole("row", { name: new RegExp(client) });
+  await expect(row).toContainText("Pendiente");
+  await expect(row.getByRole("button", { name: "Suspender" })).toHaveCount(0);
+
+  await row.getByRole("button", { name: "Activar" }).click();
+  await expect(row).toContainText("Activa");
+  await row.getByRole("button", { name: "Suspender" }).click();
+  await expect(row).toContainText("Suspendida");
+  await row.getByRole("button", { name: "Reactivar" }).click();
+  await expect(row).toContainText("Activa");
+
+  page.once("dialog", (dialog) => dialog.accept());
+  await row.getByRole("button", { name: "Cancelar" }).click();
+  await expect(row).toContainText("Cancelada");
+  await expect(row.getByRole("button", { name: "Activar" })).toHaveCount(0);
+  await expect(row.getByRole("button", { name: "Cancelar" })).toHaveCount(0);
+});
