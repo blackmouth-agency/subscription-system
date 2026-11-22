@@ -9,6 +9,24 @@ import { authHeaders, idParam } from "./schemas.ts";
 const internalError = () =>
   new HTTPException(500, { message: "Error interno." });
 
+// P0409: conflicto lanzado por un trigger; 23514: viola un check.
+const writeError = (error: { code?: string; message: string }) =>
+  error.code === "P0409"
+    ? new HTTPException(409, { message: error.message })
+    : error.code === "23514"
+    ? new HTTPException(400, { message: "Datos inválidos." })
+    : internalError();
+
+// Constraint de FK -> mensaje 404.
+const fkError = (
+  error: { code?: string; message: string },
+  fkNotFound: Record<string, string>,
+) => {
+  const key = error.code === "23503" &&
+    Object.keys(fkNotFound).find((k) => error.message.includes(k));
+  return key ? new HTTPException(404, { message: fkNotFound[key] }) : undefined;
+};
+
 // `authorize` + `execute` de una tabla de admin: lista, crea y edita. La RLS
 // decide quién puede; `notFound` es el mensaje del 404 al editar. Opcionales:
 // `select` (con joins), `order`, `filters` (query params que filtran con `eq`)
@@ -58,13 +76,7 @@ export function crudService<Row>(
     const db = await adminDb(authorization, apikey);
     const { data, error } = await db.from(table).insert(body).select(select)
       .single();
-    if (error?.code === "23503") {
-      const key = Object.keys(fkNotFound).find((k) =>
-        error.message.includes(k)
-      );
-      if (key) throw new HTTPException(404, { message: fkNotFound[key] });
-    }
-    if (error) throw internalError();
+    if (error) throw fkError(error, fkNotFound) ?? writeError(error);
     c.set("row", data as unknown as Row);
     await next();
   });
@@ -75,10 +87,10 @@ export function crudService<Row>(
     const body = c.req.valid("json" as never);
     const db = await adminDb(authorization, apikey);
     const { data, error } = await db.from(table).update(body).eq("id", id)
-      .select();
-    if (error) throw internalError();
+      .select(select);
+    if (error) throw fkError(error, fkNotFound) ?? writeError(error);
     if (data.length === 0) throw new HTTPException(404, { message: notFound });
-    c.set("row", data[0]);
+    c.set("row", data[0] as unknown as Row);
     await next();
   });
 
