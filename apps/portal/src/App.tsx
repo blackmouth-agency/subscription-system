@@ -3,6 +3,7 @@ import { createClient, type Session } from "@supabase/supabase-js";
 import ClientsPage from "./pages/ClientsPage";
 import PartnersPage from "./pages/PartnersPage";
 import ProductsPage from "./pages/ProductsPage";
+import SubscriptionsPage from "./pages/SubscriptionsPage";
 import AdminTemplate from "./templates/AdminTemplate";
 
 // Un enlace de correo vencido o ya usado vuelve al portal con el error en la
@@ -390,6 +391,15 @@ export default function App() {
           )}
           {window.location.pathname === "/admin/clients" && (
             <ClientsPage accessToken={session.access_token} />
+          )}
+          {window.location.pathname === "/admin/subscriptions" && (
+            <SubscriptionsPage
+              accessToken={session.access_token}
+              clientId={
+                new URLSearchParams(window.location.search).get("client_id") ??
+                undefined
+              }
+            />
           )}
           {window.location.pathname === "/admin/partners" && (
             <PartnersPage accessToken={session.access_token} />

@@ -36,6 +36,9 @@ export default function ClientTable({
               <button type="button" onClick={() => onEdit(client)}>
                 Editar
               </button>
+              <a href={`/admin/subscriptions?client_id=${client.id}`}>
+                Suscripciones
+              </a>
             </td>
           </tr>
         ))}
