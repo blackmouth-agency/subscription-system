@@ -698,3 +698,115 @@ for (const [resource, callResource, body, patch] of resources) {
     }
   });
 }
+
+Deno.test("cobros: lista con filtros, receptor, reparto y totales", async () => {
+  const token = await signInNewUser(true);
+  const post = async (call: typeof callClients, body: unknown) =>
+    await (await call(token, "POST", "", body)).json();
+  const client = await post(callClients, { name: "A" });
+  const other = await post(callClients, { name: "B" });
+  const p1 = await post(callProducts, { name: "P1", price: 50000 });
+  const p2 = await post(callProducts, { name: "P2", price: 20000 });
+  const sub = (client_id: string, product_id: string, price: number) =>
+    post(callSubscriptions, { client_id, product_id, price }).then((s) =>
+      s.id as string
+    );
+  const s1 = await sub(client.id, p1.id, 50000);
+  const s2 = await sub(client.id, p2.id, 20000);
+  const s3 = await sub(other.id, p1.id, 50000);
+
+  const { default: postgres } = await import("postgres");
+  const sql = postgres(Deno.env.get("DB_URL")!);
+  await sql`insert into public.installments (subscription_id, due_date, amount, status) values
+    (${s1}, '2026-01-10', 50000, 'to_activate'),
+    (${s1}, '2026-02-10', 50000, 'to_activate'),
+    (${s2}, '2099-01-10', 20000, 'pending'),
+    (${s3}, '2026-01-10', 50000, 'pending')`;
+  await sql.end();
+  const today = new Date().toLocaleDateString("en-CA", {
+    timeZone: "America/Bogota",
+  });
+  const paid = await fetch(`${apiRoot}/subscriptions/${s1}/payments`, {
+    method: "POST",
+    headers: {
+      apikey: publishableKey,
+      authorization: `Bearer ${token}`,
+      "content-type": "application/json",
+      "idempotency-key": crypto.randomUUID(),
+    },
+    body: JSON.stringify({ amount: 50000, paid_at: today, method: "cash" }),
+  });
+  assertEquals(paid.status, 201);
+  await paid.body?.cancel();
+
+  type Out = {
+    totals: { collected: number; commission: number; agency: number };
+    rows: Record<string, unknown>[];
+  };
+  const list = async (qs: string): Promise<Out> =>
+    await (await fetch(`${apiRoot}/installments?${qs}`, {
+      headers: { apikey: publishableKey, authorization: `Bearer ${token}` },
+    })).json();
+  const mine = `client_id=${client.id}`;
+
+  const all = await list(mine);
+  assertEquals(all.rows.length, 3);
+  // Más reciente primero.
+  assertEquals(all.rows.map((r) => r.due_date), [
+    "2099-01-10",
+    "2026-02-10",
+    "2026-01-10",
+  ]);
+  const first = all.rows[2];
+  assertEquals(first.display_status, "paid");
+  assertEquals(first.receiver, "agency");
+  assertEquals(first.paid_at, today);
+  assertEquals(first.client_name, "A");
+  assertEquals(first.product_name, "P1");
+  assertEquals(
+    [first.commission_amount, first.agency_amount],
+    [0, 50000],
+  );
+  assertEquals(all.totals, { collected: 50000, commission: 0, agency: 50000 });
+
+  assertEquals((await list(`${mine}&product_id=${p2.id}`)).rows.length, 1);
+  assertEquals((await list(`${mine}&status=overdue`)).rows.length, 1);
+  assertEquals((await list(`${mine}&status=pending`)).rows.length, 1);
+  // Periodo inclusivo en ambos extremos.
+  assertEquals(
+    (await list(`${mine}&from=2026-01-10&to=2026-02-10`)).rows.length,
+    2,
+  );
+  // Los totales siguen al filtro.
+  assertEquals(
+    (await list(`${mine}&status=overdue`)).totals,
+    { collected: 0, commission: 0, agency: 0 },
+  );
+  assertEquals(
+    (await list(`client_id=${other.id}`)).rows[0].display_status,
+    "overdue",
+  );
+  assertEquals(
+    (await list(`client_id=${crypto.randomUUID()}`)).rows,
+    [],
+  );
+
+  for (
+    const qs of ["from=2026-02-01&to=2026-01-01", "client_id=x", "status=x"]
+  ) {
+    const bad = await fetch(`${apiRoot}/installments?${qs}`, {
+      headers: { apikey: publishableKey, authorization: `Bearer ${token}` },
+    });
+    assertEquals(bad.status, 400);
+    await bad.body?.cancel();
+  }
+
+  const forbidden = await fetch(`${apiRoot}/installments`, {
+    headers: {
+      apikey: publishableKey,
+      authorization: `Bearer ${await signInNewUser(false)}`,
+    },
+  });
+  assertEquals(forbidden.status, 403);
+  await forbidden.body?.cancel();
+});

@@ -1,3 +1,4 @@
+import DataTable from "../molecules/DataTable";
 import { cop, receivers, statuses } from "../subscriptionLabels";
 
 export type HistoryEntry = {
@@ -38,35 +39,20 @@ export default function SubscriptionHistory({
       <button type="button" onClick={onClose}>
         Cerrar historial
       </button>
-      {entries.length === 0 ? (
-        <p>Sin cambios registrados</p>
-      ) : (
-        <table>
-          <thead>
-            <tr>
-              <th scope="col">Fecha</th>
-              <th scope="col">Quién</th>
-              <th scope="col">Campo</th>
-              <th scope="col">Anterior</th>
-              <th scope="col">Nuevo</th>
-            </tr>
-          </thead>
-          <tbody>
-            {entries.map((e) => {
-              const [label, format] = fields[e.field];
-              return (
-                <tr key={e.id}>
-                  <td>{new Date(e.changed_at).toLocaleString("es-CO")}</td>
-                  <td>{e.changed_by_email}</td>
-                  <td>{label}</td>
-                  <td>{format(e.old_value)}</td>
-                  <td>{format(e.new_value)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      )}
+      <DataTable
+        empty="Sin cambios registrados"
+        rows={entries}
+        columns={[
+          {
+            header: "Fecha",
+            cell: (e) => new Date(e.changed_at).toLocaleString("es-CO"),
+          },
+          { header: "Quién", cell: (e) => e.changed_by_email },
+          { header: "Campo", cell: (e) => fields[e.field][0] },
+          { header: "Anterior", cell: (e) => fields[e.field][1](e.old_value) },
+          { header: "Nuevo", cell: (e) => fields[e.field][1](e.new_value) },
+        ]}
+      />
     </section>
   );
 }

@@ -1,5 +1,6 @@
 import { useForm } from "react-hook-form";
-import { maxLength, trim } from "../forms";
+import { maxLength, positiveInt, requiredName } from "../forms";
+import FormActions from "../molecules/FormActions";
 import FormField from "../molecules/FormField";
 
 export type NewProduct = {
@@ -33,11 +34,7 @@ export default function ProductForm({
         id="product-name"
         label="Nombre"
         error={errors.name?.message}
-        {...register("name", {
-          setValueAs: trim,
-          required: "Escribe el nombre.",
-          maxLength: maxLength(100),
-        })}
+        {...register("name", requiredName)}
       />
       <FormField
         multiline
@@ -52,17 +49,16 @@ export default function ProductForm({
         type="number"
         inputMode="numeric"
         error={errors.price?.message}
-        {...register("price", {
-          valueAsNumber: true,
-          validate: (price) =>
-            (Number.isInteger(price) && price > 0) ||
-            "El precio debe ser un entero mayor a 0.",
-        })}
+        {...register(
+          "price",
+          positiveInt("El precio debe ser un entero mayor a 0."),
+        )}
       />
-      <button type="submit" disabled={isSubmitting}>
-        Crear producto
-      </button>
-      <p role="alert">{error}</p>
+      <FormActions
+        submitLabel="Crear producto"
+        isSubmitting={isSubmitting}
+        error={error}
+      />
     </form>
   );
 }

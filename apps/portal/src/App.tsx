@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { createClient, type Session } from "@supabase/supabase-js";
 import ClientsPage from "./pages/ClientsPage";
 import PartnersPage from "./pages/PartnersPage";
+import PaymentsPage from "./pages/PaymentsPage";
 import ProductsPage from "./pages/ProductsPage";
 import SubscriptionsPage from "./pages/SubscriptionsPage";
 import AdminTemplate from "./templates/AdminTemplate";
@@ -400,6 +401,9 @@ export default function App() {
                 undefined
               }
             />
+          )}
+          {window.location.pathname === "/admin/payments" && (
+            <PaymentsPage accessToken={session.access_token} />
           )}
           {window.location.pathname === "/admin/partners" && (
             <PartnersPage accessToken={session.access_token} />

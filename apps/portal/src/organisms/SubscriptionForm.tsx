@@ -1,5 +1,9 @@
 import { useForm, useWatch } from "react-hook-form";
+import { positiveInt, toOptions, today } from "../forms";
+import FormActions from "../molecules/FormActions";
 import FormField from "../molecules/FormField";
+import SelectField from "../molecules/SelectField";
+import { receivers } from "../subscriptionLabels";
 import type { Subscription } from "./SubscriptionTable";
 
 export type NewSubscription = {
@@ -17,10 +21,18 @@ export type NewSubscription = {
 // `partner_id` vacío = venta directa.
 type FormData = Omit<NewSubscription, "partner_id"> & { partner_id: string };
 
-type Option = { id: string; name: string };
+type Row = { id: string; name: string };
 
-// `toLocaleDateString("sv")` da YYYY-MM-DD en hora local.
-const today = () => new Date().toLocaleDateString("sv");
+const durations = [
+  { value: "indefinite", label: "Indefinida" },
+  { value: "months", label: "N mensualidades" },
+  { value: "once", label: "Única" },
+];
+
+const receiverOptions = Object.entries(receivers).map(([value, label]) => ({
+  value,
+  label,
+}));
 
 const direct = {
   commission: 0,
@@ -42,9 +54,9 @@ export default function SubscriptionForm({
   error,
 }: {
   subscription?: Subscription;
-  clients: Option[];
-  products: (Option & { price: number })[];
-  partners: Option[];
+  clients: Row[];
+  products: (Row & { price: number })[];
+  partners: Row[];
   clientId?: string;
   onSubmit: (subscription: NewSubscription) => Promise<boolean>;
   onCancel: () => void;
@@ -82,24 +94,22 @@ export default function SubscriptionForm({
         if (await onSubmit(body)) reset(initial);
       })}
     >
-      <label htmlFor="subscription-client">Cliente</label>
-      <select
+      <SelectField
         id="subscription-client"
+        label="Cliente"
+        placeholder="Elige un cliente"
+        options={toOptions(clients)}
         disabled={!!subscription}
+        error={errors.client_id?.message}
         {...register("client_id", { required: "Elige el cliente." })}
-      >
-        <option value="">Elige un cliente</option>
-        {clients.map((client) => (
-          <option key={client.id} value={client.id}>
-            {client.name}
-          </option>
-        ))}
-      </select>
-      <span role="alert">{errors.client_id?.message}</span>
-      <label htmlFor="subscription-product">Producto</label>
-      <select
+      />
+      <SelectField
         id="subscription-product"
+        label="Producto"
+        placeholder="Elige un producto"
+        options={toOptions(products)}
         disabled={!!subscription}
+        error={errors.product_id?.message}
         {...register("product_id", {
           required: "Elige el producto.",
           onChange: (event) => {
@@ -107,15 +117,7 @@ export default function SubscriptionForm({
             if (product) setValue("price", product.price);
           },
         })}
-      >
-        <option value="">Elige un producto</option>
-        {products.map((product) => (
-          <option key={product.id} value={product.id}>
-            {product.name}
-          </option>
-        ))}
-      </select>
-      <span role="alert">{errors.product_id?.message}</span>
+      />
       <FormField
         id="subscription-price"
         label="Precio (COP)"
@@ -123,12 +125,10 @@ export default function SubscriptionForm({
         inputMode="numeric"
         disabled={!!subscription}
         error={errors.price?.message}
-        {...register("price", {
-          valueAsNumber: true,
-          validate: (price) =>
-            (Number.isInteger(price) && price > 0) ||
-            "El precio debe ser un entero mayor a 0.",
-        })}
+        {...register(
+          "price",
+          positiveInt("El precio debe ser un entero mayor a 0."),
+        )}
       />
       <FormField
         id="subscription-cycle-date"
@@ -138,15 +138,13 @@ export default function SubscriptionForm({
         error={errors.cycle_date?.message}
         {...register("cycle_date", { required: "Elige la fecha del ciclo." })}
       />
-      <label htmlFor="subscription-partner">Socio</label>
-      <select id="subscription-partner" {...register("partner_id")}>
-        <option value="">Sin socio (venta directa)</option>
-        {partners.map((partner) => (
-          <option key={partner.id} value={partner.id}>
-            {partner.name}
-          </option>
-        ))}
-      </select>
+      <SelectField
+        id="subscription-partner"
+        label="Socio"
+        placeholder="Sin socio (venta directa)"
+        options={toOptions(partners)}
+        {...register("partner_id")}
+      />
       {hasPartner && (
         <>
           <FormField
@@ -165,12 +163,12 @@ export default function SubscriptionForm({
                 "La comisión debe ser un entero entre 0 y el precio.",
             })}
           />
-          <label htmlFor="subscription-duration">Duración</label>
-          <select id="subscription-duration" {...register("commission_type")}>
-            <option value="indefinite">Indefinida</option>
-            <option value="months">N mensualidades</option>
-            <option value="once">Única</option>
-          </select>
+          <SelectField
+            id="subscription-duration"
+            label="Duración"
+            options={durations}
+            {...register("commission_type")}
+          />
           {isMonths && (
             <FormField
               id="subscription-months"
@@ -178,30 +176,26 @@ export default function SubscriptionForm({
               type="number"
               inputMode="numeric"
               error={errors.commission_months?.message}
-              {...register("commission_months", {
-                valueAsNumber: true,
-                validate: (months) =>
-                  (Number.isInteger(months) && (months ?? 0) > 0) ||
-                  "Las mensualidades deben ser un entero mayor a 0.",
-              })}
+              {...register(
+                "commission_months",
+                positiveInt("Las mensualidades deben ser un entero mayor a 0."),
+              )}
             />
           )}
-          <label htmlFor="subscription-receiver">Receptor</label>
-          <select id="subscription-receiver" {...register("receiver")}>
-            <option value="agency">Agencia</option>
-            <option value="partner">Socio</option>
-          </select>
+          <SelectField
+            id="subscription-receiver"
+            label="Receptor"
+            options={receiverOptions}
+            {...register("receiver")}
+          />
         </>
       )}
-      <button type="submit" disabled={isSubmitting}>
-        {subscription ? "Guardar suscripción" : "Crear suscripción"}
-      </button>
-      {subscription && (
-        <button type="button" onClick={onCancel}>
-          Cancelar
-        </button>
-      )}
-      <p role="alert">{error}</p>
+      <FormActions
+        submitLabel={subscription ? "Guardar suscripción" : "Crear suscripción"}
+        isSubmitting={isSubmitting}
+        onCancel={subscription && onCancel}
+        error={error}
+      />
     </form>
   );
 }

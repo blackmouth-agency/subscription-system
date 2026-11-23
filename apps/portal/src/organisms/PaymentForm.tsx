@@ -1,6 +1,8 @@
 import { useForm } from "react-hook-form";
-import { maxLength, trim } from "../forms";
+import { positiveInt, text, today } from "../forms";
+import FormActions from "../molecules/FormActions";
 import FormField from "../molecules/FormField";
+import SelectField from "../molecules/SelectField";
 import { paymentMethods } from "../subscriptionLabels";
 
 export type NewPayment = {
@@ -10,7 +12,10 @@ export type NewPayment = {
   reference: string;
 };
 
-const today = () => new Date().toLocaleDateString("sv");
+const methodOptions = Object.entries(paymentMethods).map(([value, label]) => ({
+  value,
+  label,
+}));
 
 export default function PaymentForm({
   onSubmit,
@@ -42,12 +47,10 @@ export default function PaymentForm({
         type="number"
         inputMode="numeric"
         error={errors.amount?.message}
-        {...register("amount", {
-          valueAsNumber: true,
-          validate: (amount) =>
-            (Number.isInteger(amount) && amount > 0) ||
-            "El importe debe ser un entero mayor a 0.",
-        })}
+        {...register(
+          "amount",
+          positiveInt("El importe debe ser un entero mayor a 0."),
+        )}
       />
       <FormField
         id="payment-date"
@@ -60,27 +63,23 @@ export default function PaymentForm({
             date <= today() || "La fecha no puede ser futura.",
         })}
       />
-      <label htmlFor="payment-method">Medio</label>
-      <select id="payment-method" {...register("method")}>
-        {Object.entries(paymentMethods).map(([value, label]) => (
-          <option key={value} value={value}>
-            {label}
-          </option>
-        ))}
-      </select>
+      <SelectField
+        id="payment-method"
+        label="Medio"
+        options={methodOptions}
+        {...register("method")}
+      />
       <FormField
         id="payment-reference"
         label="Referencia (opcional)"
         error={errors.reference?.message}
-        {...register("reference", {
-          setValueAs: trim,
-          maxLength: maxLength(200),
-        })}
+        {...register("reference", text(200))}
       />
-      <button type="submit" disabled={isSubmitting}>
-        Registrar pago
-      </button>
-      <p role="alert">{error}</p>
+      <FormActions
+        submitLabel="Registrar pago"
+        isSubmitting={isSubmitting}
+        error={error}
+      />
     </form>
   );
 }

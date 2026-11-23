@@ -1,3 +1,5 @@
+import DataTable from "../molecules/DataTable";
+
 export type Client = {
   id: string;
   name: string;
@@ -14,35 +16,28 @@ export default function ClientTable({
   onEdit: (client: Client) => void;
 }) {
   return (
-    <table>
-      <caption>Clientes</caption>
-      <thead>
-        <tr>
-          <th scope="col">Nombre</th>
-          <th scope="col">Contacto</th>
-          <th scope="col">Correo</th>
-          <th scope="col">Teléfono</th>
-          <th scope="col">Acciones</th>
-        </tr>
-      </thead>
-      <tbody>
-        {clients.map((client) => (
-          <tr key={client.id}>
-            <td>{client.name}</td>
-            <td>{client.contact_name}</td>
-            <td>{client.email}</td>
-            <td>{client.phone}</td>
-            <td>
-              <button type="button" onClick={() => onEdit(client)}>
+    <DataTable
+      caption="Clientes"
+      rows={clients}
+      columns={[
+        { header: "Nombre", cell: (c) => c.name },
+        { header: "Contacto", cell: (c) => c.contact_name },
+        { header: "Correo", cell: (c) => c.email },
+        { header: "Teléfono", cell: (c) => c.phone },
+        {
+          header: "Acciones",
+          cell: (c) => (
+            <>
+              <button type="button" onClick={() => onEdit(c)}>
                 Editar
               </button>
-              <a href={`/admin/subscriptions?client_id=${client.id}`}>
+              <a href={`/admin/subscriptions?client_id=${c.id}`}>
                 Suscripciones
               </a>
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+            </>
+          ),
+        },
+      ]}
+    />
   );
 }
