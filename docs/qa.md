@@ -59,12 +59,12 @@ Son las preguntas de mayor riesgo. Si la respuesta no es la que asume la especif
 
 ## 4. Ciclo de facturación y fechas
 
-- [ ] **Regla de fin de mes** (MVP-SUS-06): con "31 ene. → 28 feb. → 28 mar.", un cliente del día 31 pasa al día 28 de forma permanente después de febrero. ¿Es intencional? La alternativa habitual es conservar el día 31 y cobrar el último día de cada mes (31 ene. → 28 feb. → 31 mar.).
-- [ ] **Cambio de fecha del ciclo sin prorrateo** (MVP-SUS-05): si se mueve el día 10 al 25, ¿el periodo actual se alarga 15 días gratis o se cobra el día 25 del mismo mes, de modo que el cliente paga dos veces en 15 días? Hay que definir cuál de los dos ocurre.
-- [ ] **Reactivación** (MVP-PAG-09): "el nuevo ciclo inicia en la fecha de reactivación" cambia el día habitual de cobro. ¿Es intencional? ¿Se cobra de inmediato la primera mensualidad del nuevo ciclo?
-- [ ] **¿Con cuánta anticipación se genera el cobro?** ¿El enlace se envía el mismo día del vencimiento o N días antes? ¿El débito automático se ejecuta el día exacto?
-- [ ] **Zona horaria:** todas las fechas y procesos programados en America/Bogotá, ¿correcto? ¿A qué hora del día se ejecutan los cobros automáticos?
-- [ ] **Primera mensualidad de una venta nueva** (Flujo B, paso 6): ¿se cobra al contratar o en la fecha del ciclo? ¿La suscripción está "pendiente de activación" hasta el primer pago?
+- [x] **Regla de fin de mes** (MVP-SUS-06): con "31 ene. → 28 feb. → 28 mar.", un cliente del día 31 pasa al día 28 de forma permanente después de febrero. ¿Es intencional? La alternativa habitual es conservar el día 31 y cobrar el último día de cada mes (31 ene. → 28 feb. → 31 mar.). **Respuesta:** Sí, se conserva el arrastre (31 → 28 permanente).
+- [x] **Cambio de fecha del ciclo sin prorrateo** (MVP-SUS-05): si se mueve el día 10 al 25, ¿el periodo actual se alarga 15 días gratis o se cobra el día 25 del mismo mes, de modo que el cliente paga dos veces en 15 días? Hay que definir cuál de los dos ocurre. **Respuesta:** Opción A: el periodo actual se alarga, sin cobro doble.
+- [x] **Reactivación** (MVP-PAG-09): "el nuevo ciclo inicia en la fecha de reactivación" cambia el día habitual de cobro. ¿Es intencional? ¿Se cobra de inmediato la primera mensualidad del nuevo ciclo? **Respuesta:** Se conserva el día habitual.
+- [x] **¿Con cuánta anticipación se genera el cobro?** ¿El enlace se envía el mismo día del vencimiento o N días antes? ¿El débito automático se ejecuta el día exacto? **Respuesta:** No se genera por adelantado.
+- [x] **Zona horaria:** todas las fechas y procesos programados en America/Bogotá, ¿correcto? ¿A qué hora del día se ejecutan los cobros automáticos? **Respuesta:** Sí, Bogotá.
+- [x] **Primera mensualidad de una venta nueva** (Flujo B, paso 6): ¿se cobra al contratar o en la fecha del ciclo? ¿La suscripción está "pendiente de activación" hasta el primer pago? **Respuesta:** Se genera `to_activate` desde `cycle_date`; la suscripción sigue `pending`.
 
 ---
 
@@ -73,11 +73,11 @@ Son las preguntas de mayor riesgo. Si la respuesta no es la que asume la especif
 Hay dos máquinas de estados (cobro y suscripción) que no están definidas por completo.
 
 - [ ] **Estados de cobro** (MVP-PAG-03): ¿cuál es la diferencia exacta entre *pendiente*, *vencido* y *fallido*? Propuesta para validar: `pendiente` (emitido, dentro del plazo) → `vencido` (pasaron los días de gracia) y `fallido` (Wompi rechazó un intento, pero el cobro sigue abierto). ¿Hace falta un estado `anulado` para los cobros de una suscripción cancelada?
-- [ ] **¿Qué activa una suscripción "pendiente de activación"?** (MVP-SUS-07) ¿El primer pago, una acción del administrador o la entrega del producto?
+- [x] **¿Qué activa una suscripción "pendiente de activación"?** (MVP-SUS-07) ¿El primer pago, una acción del administrador o la entrega del producto? **Respuesta:** El primer pago.
 - [ ] **Suspensión manual frente a bloqueo administrativo** (MVP-PAG-09): ¿son dos cosas diferentes? Si el administrador suspende por impago y el cliente paga, se reactiva sola; si la "bloquea", no. ¿Hace falta un indicador aparte de "no reactivar automáticamente"?
 - [ ] **Días de gracia:** ¿se cuentan desde la fecha de vencimiento o desde el primer intento fallido? ¿Durante la gracia se sigue intentando el débito?
 - [ ] **Pago que llega a una suscripción cancelada o suspendida** (por ejemplo, el cliente paga un enlace viejo): ¿se acepta, se marca para revisión o se reembolsa?
-- [ ] **Cancelación:** ¿es inmediata o al final del periodo pagado? ¿Las deudas pendientes siguen siendo cobrables? ¿Se elimina el token de débito?
+- [x] **Cancelación:** ¿es inmediata o al final del periodo pagado? ¿Las deudas pendientes siguen siendo cobrables? ¿Se elimina el token de débito? **Respuesta:** Al final del periodo; es prepago, no hay deuda.
 - [ ] **Intereses de mora o recargos:** ¿no existen? Conviene dejarlo escrito.
 - [ ] **Suspensión del servicio real:** "cuando esté disponible en el producto" (MVP-SUS-07). En el MVP, ¿la suspensión es solo un estado en este sistema y alguien apaga el servicio a mano, o hay alguna integración con los productos?
 
