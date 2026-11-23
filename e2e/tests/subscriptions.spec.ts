@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { createUser, signInAt } from "./helpers";
+import pg from "pg";
 
 test("el admin crea una suscripción y la ve en el cliente", async ({ page }) => {
   await signInAt(page, await createUser(true), "/admin/clients");
@@ -162,4 +163,49 @@ test("el admin ve el historial de cambios de una suscripción", async ({ page })
   await expect(entry).toContainText(email);
   await expect(entry).toContainText("Pendiente");
   await expect(entry).toContainText("Activa");
+});
+
+test("el admin ve las mensualidades de una suscripción", async ({ page }) => {
+  await signInAt(page, await createUser(true), "/admin/clients");
+  const client = `Acme ${crypto.randomUUID()}`;
+  await page.getByLabel("Nombre o razón social").fill(client);
+  await page.getByRole("button", { name: "Crear cliente" }).click();
+  await expect(page.getByRole("row", { name: new RegExp(client) }))
+    .toBeVisible();
+
+  await page.goto("/admin/products");
+  const product = `Hosting ${crypto.randomUUID()}`;
+  await page.getByLabel("Nombre", { exact: true }).fill(product);
+  await page.getByLabel("Precio (COP)").fill("50000");
+  await page.getByRole("button", { name: "Crear producto" }).click();
+  await expect(page.getByRole("row", { name: new RegExp(product) }))
+    .toBeVisible();
+
+  await page.goto("/admin/subscriptions");
+  await page.getByLabel("Cliente").selectOption({ label: client });
+  await page.getByLabel("Producto").selectOption({ label: product });
+  await page.getByRole("button", { name: "Crear suscripción" }).click();
+  const row = page.getByRole("row", { name: new RegExp(client) });
+  await row.getByRole("button", { name: "Mensualidades" }).click();
+  await expect(page.getByText("Sin mensualidades")).toBeVisible();
+
+  // Sin API de escritura: se siembra por la conexión directa.
+  const db = new pg.Client({ connectionString: process.env.DB_URL });
+  await db.connect();
+  await db.query("select public.generate_installments()");
+  await db.query(
+    `insert into public.installments (subscription_id, due_date, amount, status)
+     select s.id, current_date - 30, 50000, 'pending'
+     from public.subscriptions s join public.clients c on c.id = s.client_id
+     where c.name = $1`,
+    [client],
+  );
+  await db.end();
+
+  await row.getByRole("button", { name: "Mensualidades" }).click();
+  const installments = page.locator("section", { hasText: "Cerrar mensualidades" });
+  await expect(installments.getByRole("row", { name: /Vencida/ }))
+    .toContainText("50.000");
+  await expect(installments.getByRole("row", { name: /Por activar/ }))
+    .toBeVisible();
 });

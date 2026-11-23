@@ -469,6 +469,79 @@ Deno.test("suscripciones: lista el historial de cambios, el más reciente primer
   await forbidden.body?.cancel();
 });
 
+Deno.test("suscripciones: lista las mensualidades con su estado calculado", async () => {
+  const token = await signInNewUser(true);
+  const client = await (await callClients(token, "POST", "", { name: "A" }))
+    .json();
+  const product = await (await callProducts(token, "POST", "", {
+    name: "P",
+    price: 50000,
+  })).json();
+  const create = async () =>
+    (await (await callSubscriptions(token, "POST", "", {
+      client_id: client.id,
+      product_id: product.id,
+      price: 50000,
+    })).json()).id as string;
+  const list = async (id: string) =>
+    await (await callSubscriptions(token, "GET", `/${id}/installments`))
+      .json() as { due_date: string; display_status: string }[];
+  const daysAgo = (n: number) =>
+    new Date(Date.now() - n * 86_400_000).toLocaleDateString("en-CA", {
+      timeZone: "America/Bogota",
+    });
+
+  const id = await create();
+  assertEquals(await list(id), []);
+
+  // Sin API de escritura: se siembra por la conexión directa.
+  const { default: postgres } = await import("postgres");
+  const sql = postgres(Deno.env.get("DB_URL")!);
+  const seed = (sub: string) =>
+    sql`insert into public.installments (subscription_id, due_date, amount, status) values
+      (${sub}, ${daysAgo(30)}, 50000, 'pending'),
+      (${sub}, ${daysAgo(4)}, 50000, 'pending'),
+      (${sub}, ${daysAgo(3)}, 50000, 'pending'),
+      (${sub}, ${daysAgo(0)}, 50000, 'to_activate')`;
+  await seed(id);
+  const cancelledId = await create();
+  await seed(cancelledId);
+  await sql`update public.subscriptions set status = 'cancelled' where id = ${cancelledId}`;
+  await sql.end();
+
+  assertEquals((await list(id)).map((i) => i.display_status), [
+    "overdue",
+    "overdue",
+    "pending",
+    "to_activate",
+  ]);
+  assertEquals((await list(cancelledId)).map((i) => i.display_status), [
+    "voided",
+    "voided",
+    "voided",
+    "voided",
+  ]);
+
+  const missing = await callSubscriptions(
+    token,
+    "GET",
+    `/${crypto.randomUUID()}/installments`,
+  );
+  assertEquals(missing.status, 404);
+  assertEquals((await missing.json()).message, "Suscripción no encontrada");
+  const bad = await callSubscriptions(token, "GET", "/no-uuid/installments");
+  assertEquals(bad.status, 400);
+  await bad.body?.cancel();
+
+  const forbidden = await callSubscriptions(
+    await signInNewUser(false),
+    "GET",
+    `/${id}/installments`,
+  );
+  assertEquals(forbidden.status, 403);
+  await forbidden.body?.cancel();
+});
+
 const resources = [
   ["products", callProducts, { name: "x", price: 1000 }, undefined],
   ["clients", callClients, { name: "x" }, { name: "x" }],

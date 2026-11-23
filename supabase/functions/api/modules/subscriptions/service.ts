@@ -90,8 +90,60 @@ const authorizeAndListHistory = historyFactory.createMiddleware(
   },
 );
 
+const installmentsFactory = createFactory<
+  { Variables: { installments: unknown[] } }
+>();
+
+const graceDays = 3; // shortcut: fijos, por suscripción llega después.
+const dayMs = 86_400_000;
+
+// `vencida` no se guarda: pending con due_date + gracia < hoy (Bogotá).
+function displayStatus(
+  { status, due_date }: { status: string; due_date: string },
+  cancelled: boolean,
+  today: string,
+) {
+  if (status === "paid") return status;
+  if (cancelled) return "voided";
+  if (status === "pending") {
+    const limit = Date.parse(due_date) + graceDays * dayMs;
+    return limit < Date.parse(today) ? "overdue" : "pending";
+  }
+  return status;
+}
+
+const authorizeAndListInstallments = installmentsFactory.createMiddleware(
+  async (c, next) => {
+    const { authorization, apikey } = c.req.valid("header" as never);
+    const { id } = c.req.valid("param" as never);
+    const db = await adminDb(authorization, apikey);
+    const { data: sub } = await db.from("subscriptions").select("status")
+      .eq("id", id);
+    if (!sub?.length) {
+      throw new HTTPException(404, { message: "Suscripción no encontrada" });
+    }
+    const { data, error } = await db.from("installments").select("*")
+      .eq("subscription_id", id).order("due_date");
+    if (error) throw new HTTPException(500, { message: "Error interno." });
+    const today = new Date().toLocaleDateString("en-CA", {
+      timeZone: "America/Bogota",
+    });
+    const cancelled = sub[0].status === "cancelled";
+    c.set(
+      "installments",
+      data.map((i) => ({
+        ...i,
+        display_status: displayStatus(i, cancelled, today),
+      })),
+    );
+    await next();
+  },
+);
+
 export const service = {
   ...crud,
+  authorizeAndListInstallments,
+  installmentsFactory,
   authorizeAndChangeStatus,
   statusFactory,
   authorizeAndListHistory,

@@ -47,11 +47,13 @@ export default function SubscriptionTable({
   onEdit,
   onChangeStatus,
   onShowHistory,
+  onShowInstallments,
 }: {
   subscriptions: Subscription[];
   onEdit: (subscription: Subscription) => void;
   onChangeStatus: (id: string, status: string) => void;
   onShowHistory: (subscription: Subscription) => void;
+  onShowInstallments: (subscription: Subscription) => void;
 }) {
   return (
     <table>
@@ -88,6 +90,12 @@ export default function SubscriptionTable({
               </button>
               <button type="button" onClick={() => onShowHistory(subscription)}>
                 Historial
+              </button>
+              <button
+                type="button"
+                onClick={() => onShowInstallments(subscription)}
+              >
+                Mensualidades
               </button>
               {transitions[subscription.status].map(([status, label]) => (
                 <button

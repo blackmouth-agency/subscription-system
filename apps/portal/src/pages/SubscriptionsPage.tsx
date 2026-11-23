@@ -2,6 +2,9 @@ import { useMemo, useState } from "react";
 import { createApi } from "../api";
 import { useAdminResource } from "../hooks/useAdminResource";
 import type { Client } from "../organisms/ClientTable";
+import InstallmentTable, {
+  type Installment,
+} from "../organisms/InstallmentTable";
 import type { Partner } from "../organisms/PartnerTable";
 import type { Product } from "../organisms/ProductTable";
 import SubscriptionForm, {
@@ -52,6 +55,19 @@ export default function SubscriptionsPage({
       setHistoryError("No pudimos cargar el historial.");
     }
   }
+  const [installments, setInstallments] = useState<Installment[]>();
+  const [installmentsError, setInstallmentsError] = useState("");
+  async function showInstallments({ id }: Subscription) {
+    try {
+      const { data } = await api.get<Installment[]>(
+        `/subscriptions/${id}/installments`,
+      );
+      setInstallments(data);
+      setInstallmentsError("");
+    } catch {
+      setInstallmentsError("No pudimos cargar las mensualidades.");
+    }
+  }
   const { rows: clients } = useAdminResource<Client, never>(
     "/clients",
     accessToken,
@@ -92,7 +108,15 @@ export default function SubscriptionsPage({
             onEdit={setEditing}
             onChangeStatus={(id, status) => act(id, "status", { status })}
             onShowHistory={showHistory}
+            onShowInstallments={showInstallments}
           />
+          {installmentsError && <p role="alert">{installmentsError}</p>}
+          {installments && (
+            <InstallmentTable
+              installments={installments}
+              onClose={() => setInstallments(undefined)}
+            />
+          )}
           {historyError && <p role="alert">{historyError}</p>}
           {history && (
             <SubscriptionHistory
