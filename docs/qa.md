@@ -72,13 +72,13 @@ Son las preguntas de mayor riesgo. Si la respuesta no es la que asume la especif
 
 Hay dos máquinas de estados (cobro y suscripción) que no están definidas por completo.
 
-- [ ] **Estados de cobro** (MVP-PAG-03): ¿cuál es la diferencia exacta entre *pendiente*, *vencido* y *fallido*? Propuesta para validar: `pendiente` (emitido, dentro del plazo) → `vencido` (pasaron los días de gracia) y `fallido` (Wompi rechazó un intento, pero el cobro sigue abierto). ¿Hace falta un estado `anulado` para los cobros de una suscripción cancelada?
+- [x] **Estados de cobro** (MVP-PAG-03): ¿cuál es la diferencia exacta entre *pendiente*, *vencido* y *fallido*? Propuesta para validar: `pendiente` (emitido, dentro del plazo) → `vencido` (pasaron los días de gracia) y `fallido` (Wompi rechazó un intento, pero el cobro sigue abierto). ¿Hace falta un estado `anulado` para los cobros de una suscripción cancelada? **Respuesta:** `pendiente` → `vencido` se calcula. `anulado` no se guarda: se muestra `voided` en una cancelada. `fallido` queda para la historia 14 (Wompi).
 - [x] **¿Qué activa una suscripción "pendiente de activación"?** (MVP-SUS-07) ¿El primer pago, una acción del administrador o la entrega del producto? **Respuesta:** El primer pago.
 - [ ] **Suspensión manual frente a bloqueo administrativo** (MVP-PAG-09): ¿son dos cosas diferentes? Si el administrador suspende por impago y el cliente paga, se reactiva sola; si la "bloquea", no. ¿Hace falta un indicador aparte de "no reactivar automáticamente"?
-- [ ] **Días de gracia:** ¿se cuentan desde la fecha de vencimiento o desde el primer intento fallido? ¿Durante la gracia se sigue intentando el débito?
+- [x] **Días de gracia:** ¿se cuentan desde la fecha de vencimiento o desde el primer intento fallido? ¿Durante la gracia se sigue intentando el débito? **Respuesta:** 3 días fijos desde el vencimiento. El débito durante la gracia se decide con la historia 14.
 - [ ] **Pago que llega a una suscripción cancelada o suspendida** (por ejemplo, el cliente paga un enlace viejo): ¿se acepta, se marca para revisión o se reembolsa?
 - [x] **Cancelación:** ¿es inmediata o al final del periodo pagado? ¿Las deudas pendientes siguen siendo cobrables? ¿Se elimina el token de débito? **Respuesta:** Al final del periodo; es prepago, no hay deuda.
-- [ ] **Intereses de mora o recargos:** ¿no existen? Conviene dejarlo escrito.
+- [x] **Intereses de mora o recargos:** ¿no existen? Conviene dejarlo escrito. **Respuesta:** No existen.
 - [ ] **Suspensión del servicio real:** "cuando esté disponible en el producto" (MVP-SUS-07). En el MVP, ¿la suspensión es solo un estado en este sistema y alguien apaga el servicio a mano, o hay alguna integración con los productos?
 
 ---

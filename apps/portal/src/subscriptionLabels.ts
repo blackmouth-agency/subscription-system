@@ -11,6 +11,14 @@ export const statuses: Record<string, string> = {
   cancelled: "Cancelada",
 };
 
+export const installmentStatuses: Record<string, string> = {
+  to_activate: "Por activar",
+  pending: "Pendiente",
+  overdue: "Vencida",
+  paid: "Pagada",
+  voided: "Anulada",
+};
+
 export const receivers: Record<string, string> = {
   agency: "Agencia",
   partner: "Socio",
