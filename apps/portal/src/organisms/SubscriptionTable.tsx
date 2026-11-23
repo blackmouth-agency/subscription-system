@@ -1,3 +1,4 @@
+import DataTable from "../molecules/DataTable";
 import { cop, receivers, statuses } from "../subscriptionLabels";
 
 // Acciones válidas por estado actual (espejo de la API, que es quien decide).
@@ -56,48 +57,33 @@ export default function SubscriptionTable({
   onShowInstallments: (subscription: Subscription) => void;
 }) {
   return (
-    <table>
-      <caption>Suscripciones</caption>
-      <thead>
-        <tr>
-          <th scope="col">Cliente</th>
-          <th scope="col">Producto</th>
-          <th scope="col">Precio</th>
-          <th scope="col">Fecha del ciclo</th>
-          <th scope="col">Estado</th>
-          <th scope="col">Socio</th>
-          <th scope="col">Comisión</th>
-          <th scope="col">Duración</th>
-          <th scope="col">Receptor</th>
-          <th scope="col">Acciones</th>
-        </tr>
-      </thead>
-      <tbody>
-        {subscriptions.map((subscription) => (
-          <tr key={subscription.id}>
-            <td>{subscription.client.name}</td>
-            <td>{subscription.product.name}</td>
-            <td>{cop.format(subscription.price)}</td>
-            <td>{subscription.cycle_date}</td>
-            <td>{statuses[subscription.status]}</td>
-            <td>{subscription.partner?.name}</td>
-            <td>{cop.format(subscription.commission)}</td>
-            <td>{subscription.partner ? duration(subscription) : ""}</td>
-            <td>{receivers[subscription.receiver]}</td>
-            <td>
-              <button type="button" onClick={() => onEdit(subscription)}>
+    <DataTable
+      caption="Suscripciones"
+      rows={subscriptions}
+      columns={[
+        { header: "Cliente", cell: (s) => s.client.name },
+        { header: "Producto", cell: (s) => s.product.name },
+        { header: "Precio", cell: (s) => cop.format(s.price) },
+        { header: "Fecha del ciclo", cell: (s) => s.cycle_date },
+        { header: "Estado", cell: (s) => statuses[s.status] },
+        { header: "Socio", cell: (s) => s.partner?.name },
+        { header: "Comisión", cell: (s) => cop.format(s.commission) },
+        { header: "Duración", cell: (s) => (s.partner ? duration(s) : "") },
+        { header: "Receptor", cell: (s) => receivers[s.receiver] },
+        {
+          header: "Acciones",
+          cell: (s) => (
+            <>
+              <button type="button" onClick={() => onEdit(s)}>
                 Editar
               </button>
-              <button type="button" onClick={() => onShowHistory(subscription)}>
+              <button type="button" onClick={() => onShowHistory(s)}>
                 Historial
               </button>
-              <button
-                type="button"
-                onClick={() => onShowInstallments(subscription)}
-              >
+              <button type="button" onClick={() => onShowInstallments(s)}>
                 Mensualidades
               </button>
-              {transitions[subscription.status].map(([status, label]) => (
+              {transitions[s.status].map(([status, label]) => (
                 <button
                   key={status}
                   type="button"
@@ -106,17 +92,17 @@ export default function SubscriptionTable({
                       status !== "cancelled" ||
                       window.confirm("¿Cancelar la suscripción?")
                     ) {
-                      onChangeStatus(subscription.id, status);
+                      onChangeStatus(s.id, status);
                     }
                   }}
                 >
                   {label}
                 </button>
               ))}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+            </>
+          ),
+        },
+      ]}
+    />
   );
 }

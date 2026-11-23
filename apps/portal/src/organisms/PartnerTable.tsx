@@ -1,3 +1,5 @@
+import DataTable from "../molecules/DataTable";
+
 export type Partner = {
   id: string;
   name: string;
@@ -16,36 +18,28 @@ export default function PartnerTable({
   onEdit: (partner: Partner) => void;
 }) {
   return (
-    <table>
-      <caption>Socios</caption>
-      <thead>
-        <tr>
-          <th scope="col">Nombre</th>
-          <th scope="col">Contacto</th>
-          <th scope="col">Correo</th>
-          <th scope="col">Teléfono</th>
-          <th scope="col">Cuenta receptora</th>
-          <th scope="col">Estado</th>
-          <th scope="col">Acciones</th>
-        </tr>
-      </thead>
-      <tbody>
-        {partners.map((partner) => (
-          <tr key={partner.id}>
-            <td>{partner.name}</td>
-            <td>{partner.contact_name}</td>
-            <td>{partner.email}</td>
-            <td>{partner.phone}</td>
-            <td>{partner.receiving_account}</td>
-            <td>{partner.is_active ? "Activo" : "Inactivo"}</td>
-            <td>
-              <button type="button" onClick={() => onEdit(partner)}>
-                Editar
-              </button>
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <DataTable
+      caption="Socios"
+      rows={partners}
+      columns={[
+        { header: "Nombre", cell: (p) => p.name },
+        { header: "Contacto", cell: (p) => p.contact_name },
+        { header: "Correo", cell: (p) => p.email },
+        { header: "Teléfono", cell: (p) => p.phone },
+        { header: "Cuenta receptora", cell: (p) => p.receiving_account },
+        {
+          header: "Estado",
+          cell: (p) => (p.is_active ? "Activo" : "Inactivo"),
+        },
+        {
+          header: "Acciones",
+          cell: (p) => (
+            <button type="button" onClick={() => onEdit(p)}>
+              Editar
+            </button>
+          ),
+        },
+      ]}
+    />
   );
 }

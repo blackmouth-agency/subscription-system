@@ -1,8 +1,5 @@
-const cop = new Intl.NumberFormat("es-CO", {
-  style: "currency",
-  currency: "COP",
-  maximumFractionDigits: 0,
-});
+import DataTable from "../molecules/DataTable";
+import { cop } from "../subscriptionLabels";
 
 export type Product = {
   id: string;
@@ -13,24 +10,14 @@ export type Product = {
 
 export default function ProductTable({ products }: { products: Product[] }) {
   return (
-    <table>
-      <caption>Productos</caption>
-      <thead>
-        <tr>
-          <th scope="col">Nombre</th>
-          <th scope="col">Descripción</th>
-          <th scope="col">Precio</th>
-        </tr>
-      </thead>
-      <tbody>
-        {products.map((product) => (
-          <tr key={product.id}>
-            <td>{product.name}</td>
-            <td>{product.description}</td>
-            <td>{cop.format(product.price)}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <DataTable
+      caption="Productos"
+      rows={products}
+      columns={[
+        { header: "Nombre", cell: (p) => p.name },
+        { header: "Descripción", cell: (p) => p.description },
+        { header: "Precio", cell: (p) => cop.format(p.price) },
+      ]}
+    />
   );
 }

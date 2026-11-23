@@ -2,6 +2,7 @@ import { createFactory } from "hono/factory";
 import { HTTPException } from "hono/http-exception";
 import { adminDb } from "../../shared/admin-db.ts";
 import { crudService } from "../../shared/crud.ts";
+import { bogotaToday, displayStatus } from "../../shared/installments.ts";
 
 type Subscription = {
   id: string;
@@ -94,24 +95,6 @@ const installmentsFactory = createFactory<
   { Variables: { installments: unknown[] } }
 >();
 
-const graceDays = 3; // shortcut: fijos, por suscripción llega después.
-const dayMs = 86_400_000;
-
-// `vencida` no se guarda: pending con due_date + gracia < hoy (Bogotá).
-function displayStatus(
-  { status, due_date }: { status: string; due_date: string },
-  cancelled: boolean,
-  today: string,
-) {
-  if (status === "paid") return status;
-  if (cancelled) return "voided";
-  if (status === "pending") {
-    const limit = Date.parse(due_date) + graceDays * dayMs;
-    return limit < Date.parse(today) ? "overdue" : "pending";
-  }
-  return status;
-}
-
 const authorizeAndListInstallments = installmentsFactory.createMiddleware(
   async (c, next) => {
     const { authorization, apikey } = c.req.valid("header" as never);
@@ -125,9 +108,7 @@ const authorizeAndListInstallments = installmentsFactory.createMiddleware(
     const { data, error } = await db.from("installments").select("*")
       .eq("subscription_id", id).order("due_date");
     if (error) throw new HTTPException(500, { message: "Error interno." });
-    const today = new Date().toLocaleDateString("en-CA", {
-      timeZone: "America/Bogota",
-    });
+    const today = bogotaToday();
     const cancelled = sub[0].status === "cancelled";
     c.set(
       "installments",

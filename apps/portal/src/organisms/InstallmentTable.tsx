@@ -1,3 +1,4 @@
+import DataTable from "../molecules/DataTable";
 import { cop, installmentStatuses } from "../subscriptionLabels";
 
 export type Installment = {
@@ -20,28 +21,18 @@ export default function InstallmentTable({
       <button type="button" onClick={onClose}>
         Cerrar mensualidades
       </button>
-      {installments.length === 0 ? (
-        <p>Sin mensualidades</p>
-      ) : (
-        <table>
-          <thead>
-            <tr>
-              <th scope="col">Periodo</th>
-              <th scope="col">Monto</th>
-              <th scope="col">Estado</th>
-            </tr>
-          </thead>
-          <tbody>
-            {installments.map((i) => (
-              <tr key={i.id}>
-                <td>{i.due_date}</td>
-                <td>{cop.format(i.amount)}</td>
-                <td>{installmentStatuses[i.display_status]}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+      <DataTable
+        empty="Sin mensualidades"
+        rows={installments}
+        columns={[
+          { header: "Periodo", cell: (i) => i.due_date },
+          { header: "Monto", cell: (i) => cop.format(i.amount) },
+          {
+            header: "Estado",
+            cell: (i) => installmentStatuses[i.display_status],
+          },
+        ]}
+      />
     </section>
   );
 }
