@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { updateBody } from "../../shared/schemas.ts";
+import { authHeaders, updateBody } from "../../shared/schemas.ts";
 
 const partnerFields = {
   partner_id: z.string().uuid().nullable(),
@@ -39,4 +39,19 @@ export const listSubscriptions = z.object({
 
 export const changeStatus = z.object({
   status: z.enum(["active", "suspended", "cancelled"]),
+});
+
+export const paymentHeaders = authHeaders.extend({
+  "idempotency-key": z.string().uuid(),
+});
+
+const today = () =>
+  new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
+
+export const createPayment = z.object({
+  amount: z.number().int().positive(),
+  // `YYYY-MM-DD` ordena como texto: no puede ser futura (Bogotá).
+  paid_at: z.string().date().refine((d) => d <= today()),
+  method: z.enum(["transfer", "cash", "other"]),
+  reference: z.string().trim().max(200).default(""),
 });

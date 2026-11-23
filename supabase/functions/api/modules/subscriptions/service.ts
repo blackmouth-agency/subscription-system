@@ -140,8 +140,44 @@ const authorizeAndListInstallments = installmentsFactory.createMiddleware(
   },
 );
 
+const paymentFactory = createFactory<{ Variables: { payment: unknown } }>();
+
+// La RPC lanza 42501 (sin acceso), P0002 (no existe) o P0001 (regla: 409).
+const authorizeAndPay = paymentFactory.createMiddleware(async (c, next) => {
+  const h = c.req.valid("header" as never) as Record<string, string>;
+  const { id } = c.req.valid("param" as never);
+  const body = c.req.valid("json" as never) as {
+    amount: number;
+    paid_at: string;
+    method: string;
+    reference: string;
+  };
+  const db = await adminDb(h.authorization, h.apikey);
+  const { data, error } = await db.rpc("register_payment", {
+    p_subscription_id: id,
+    p_amount: body.amount,
+    p_paid_at: body.paid_at,
+    p_method: body.method,
+    p_reference: body.reference,
+    p_idempotency_key: h["idempotency-key"],
+  });
+  if (error) {
+    const status = { "42501": 403, P0002: 404, P0001: 409 }[error.code];
+    throw new HTTPException((status ?? 500) as 403 | 404 | 409 | 500, {
+      message: status ? error.message : "Error interno.",
+    });
+  }
+  const { data: installments, error: e2 } = await db.from("installments")
+    .select("*").eq("payment_id", data.id).order("due_date");
+  if (e2) throw new HTTPException(500, { message: "Error interno." });
+  c.set("payment", { ...data, installments });
+  await next();
+});
+
 export const service = {
   ...crud,
+  authorizeAndPay,
+  paymentFactory,
   authorizeAndListInstallments,
   installmentsFactory,
   authorizeAndChangeStatus,

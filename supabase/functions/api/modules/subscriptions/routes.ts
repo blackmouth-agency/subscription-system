@@ -3,8 +3,10 @@ import { crudRoutes } from "../../shared/crud.ts";
 import { authHeaders, idParam } from "../../shared/schemas.ts";
 import {
   changeStatus,
+  createPayment,
   createSubscription,
   listSubscriptions,
+  paymentHeaders,
   updateSubscription,
 } from "./schemas.ts";
 import { service } from "./service.ts";
@@ -34,4 +36,11 @@ export const subscriptions = crudRoutes(service, {
   ...service.installmentsFactory.createHandlers((c) =>
     c.json(c.var.installments)
   ),
+).post(
+  "/:id/payments",
+  zValidator("header", paymentHeaders),
+  zValidator("param", idParam),
+  zValidator("json", createPayment),
+  service.authorizeAndPay,
+  ...service.paymentFactory.createHandlers((c) => c.json(c.var.payment, 201)),
 );
