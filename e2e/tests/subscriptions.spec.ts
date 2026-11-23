@@ -209,3 +209,57 @@ test("el admin ve las mensualidades de una suscripción", async ({ page }) => {
   await expect(installments.getByRole("row", { name: /Por activar/ }))
     .toBeVisible();
 });
+
+test("el admin paga la primera mensualidad y activa la suscripción", async ({ page }) => {
+  await signInAt(page, await createUser(true), "/admin/clients");
+  const client = `Acme ${crypto.randomUUID()}`;
+  await page.getByLabel("Nombre o razón social").fill(client);
+  await page.getByRole("button", { name: "Crear cliente" }).click();
+  await expect(page.getByRole("row", { name: new RegExp(client) }))
+    .toBeVisible();
+
+  await page.goto("/admin/products");
+  const product = `Hosting ${crypto.randomUUID()}`;
+  await page.getByLabel("Nombre", { exact: true }).fill(product);
+  await page.getByLabel("Precio (COP)").fill("50000");
+  await page.getByRole("button", { name: "Crear producto" }).click();
+  await expect(page.getByRole("row", { name: new RegExp(product) }))
+    .toBeVisible();
+
+  await page.goto("/admin/subscriptions");
+  await page.getByLabel("Cliente").selectOption({ label: client });
+  await page.getByLabel("Producto").selectOption({ label: product });
+  await page.getByRole("button", { name: "Crear suscripción" }).click();
+  const row = page.getByRole("row", { name: new RegExp(client) });
+  await expect(row).toContainText("Pendiente");
+
+  // Sin API de escritura: la mensualidad se siembra por la conexión directa.
+  const db = new pg.Client({ connectionString: process.env.DB_URL });
+  await db.connect();
+  await db.query(
+    `insert into public.installments (subscription_id, due_date, amount, status)
+     select s.id, current_date - 30, 50000, 'to_activate'
+     from public.subscriptions s join public.clients c on c.id = s.client_id
+     where c.name = $1`,
+    [client],
+  );
+  await db.end();
+
+  await row.getByRole("button", { name: "Mensualidades" }).click();
+  const installments = page.locator("section", { hasText: "Cerrar mensualidades" });
+  await expect(installments.getByRole("row", { name: /Por activar/ }))
+    .toBeVisible();
+
+  // Un importe que no es una mensualidad completa se rechaza.
+  await page.getByLabel("Importe recibido (COP)").fill("30000");
+  await page.getByRole("button", { name: "Registrar pago" }).click();
+  await expect(page.getByRole("alert").filter({
+    hasText: "El importe no corresponde a mensualidades completas",
+  })).toBeVisible();
+
+  await page.getByLabel("Importe recibido (COP)").fill("50000");
+  await page.getByRole("button", { name: "Registrar pago" }).click();
+  await expect(installments.getByRole("row", { name: /Pagada/ }))
+    .toContainText("50.000");
+  await expect(row).toContainText("Activa");
+});

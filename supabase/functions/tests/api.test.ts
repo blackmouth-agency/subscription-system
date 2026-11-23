@@ -542,6 +542,135 @@ Deno.test("suscripciones: lista las mensualidades con su estado calculado", asyn
   await forbidden.body?.cancel();
 });
 
+Deno.test("suscripciones: registra pagos manuales de las mensualidades más antiguas", async () => {
+  const token = await signInNewUser(true);
+  const client = await (await callClients(token, "POST", "", { name: "A" }))
+    .json();
+  const product = await (await callProducts(token, "POST", "", {
+    name: "P",
+    price: 50000,
+  })).json();
+  const create = async () =>
+    (await (await callSubscriptions(token, "POST", "", {
+      client_id: client.id,
+      product_id: product.id,
+      price: 50000,
+    })).json()).id as string;
+  const today = new Date().toLocaleDateString("en-CA", {
+    timeZone: "America/Bogota",
+  });
+  const pay = (
+    id: string,
+    body: unknown,
+    key: string | null = crypto.randomUUID(),
+    auth = token,
+  ) =>
+    fetch(`${apiRoot}/subscriptions/${id}/payments`, {
+      method: "POST",
+      headers: {
+        apikey: publishableKey,
+        authorization: `Bearer ${auth}`,
+        "content-type": "application/json",
+        ...(key ? { "idempotency-key": key } : {}),
+      },
+      body: JSON.stringify(body),
+    });
+  const valid = { amount: 100000, paid_at: today, method: "transfer" };
+
+  const id = await create();
+  const { default: postgres } = await import("postgres");
+  const sql = postgres(Deno.env.get("DB_URL")!);
+  await sql`insert into public.installments (subscription_id, due_date, amount, status) values
+    (${id}, '2026-01-10', 50000, 'to_activate'),
+    (${id}, '2026-02-10', 50000, 'to_activate'),
+    (${id}, '2026-03-10', 50000, 'to_activate')`;
+  const cancelledId = await create();
+  await sql`insert into public.installments (subscription_id, due_date, amount, status)
+    values (${cancelledId}, '2026-01-10', 50000, 'pending')`;
+  await sql`update public.subscriptions set status = 'cancelled' where id = ${cancelledId}`;
+  await sql.end();
+
+  // Importe que no es suma de mensualidades completas.
+  const partial = await pay(id, { ...valid, amount: 75000 });
+  assertEquals(partial.status, 409);
+  assertEquals(
+    (await partial.json()).message,
+    "El importe no corresponde a mensualidades completas",
+  );
+
+  const key = crypto.randomUUID();
+  const ok = await pay(id, valid, key);
+  assertEquals(ok.status, 201);
+  const payment = await ok.json();
+  assertEquals(payment.amount, 100000);
+  assertEquals(
+    payment.installments.map((i: { status: string }) => i.status),
+    ["paid", "paid"],
+  );
+
+  // Repetir la clave devuelve el original sin pagar otra vez.
+  const again = await pay(id, valid, key);
+  assertEquals(again.status, 201);
+  assertEquals((await again.json()).id, payment.id);
+
+  // El primer pago activó la suscripción y la historia 10 ve "paid".
+  const list = await (await callSubscriptions(
+    token,
+    "GET",
+    `/${id}/installments`,
+  )).json() as { display_status: string }[];
+  assertEquals(list.map((i) => i.display_status), ["paid", "paid", "overdue"]);
+  const [sub] = await (await callSubscriptions(token, "GET")).json()
+    .then((rows: { id: string; status: string }[]) =>
+      rows.filter((r) => r.id === id)
+    );
+  assertEquals(sub.status, "active");
+
+  // Ya no alcanza para dos; la última sí y luego no queda nada.
+  assertEquals((await pay(id, valid)).status, 409);
+  assertEquals((await pay(id, { ...valid, amount: 50000 })).status, 201);
+  const none = await pay(id, { ...valid, amount: 50000 });
+  assertEquals(none.status, 409);
+  assertEquals((await none.json()).message, "No hay mensualidades por pagar");
+
+  const cancelled = await pay(cancelledId, { ...valid, amount: 50000 });
+  assertEquals(cancelled.status, 409);
+  assertEquals(
+    (await cancelled.json()).message,
+    "La suscripción está cancelada",
+  );
+
+  const missing = await pay(crypto.randomUUID(), valid);
+  assertEquals(missing.status, 404);
+  assertEquals((await missing.json()).message, "Suscripción no encontrada");
+
+  for (
+    const [path, body, k] of [
+      [id, valid, null],
+      [id, valid, "no-uuid"],
+      ["no-uuid", valid, crypto.randomUUID()],
+      [id, { ...valid, amount: 0 }, crypto.randomUUID()],
+      [id, { ...valid, amount: 1.5 }, crypto.randomUUID()],
+      [id, { ...valid, method: "card" }, crypto.randomUUID()],
+      [id, { ...valid, paid_at: "2999-01-01" }, crypto.randomUUID()],
+      [id, { ...valid, reference: "x".repeat(201) }, crypto.randomUUID()],
+    ] as const
+  ) {
+    const res = await pay(path, body, k);
+    assertEquals(res.status, 400, JSON.stringify([path, body, k]));
+    await res.body?.cancel();
+  }
+
+  const forbidden = await pay(
+    id,
+    valid,
+    crypto.randomUUID(),
+    await signInNewUser(false),
+  );
+  assertEquals(forbidden.status, 403);
+  assertEquals((await forbidden.json()).message, "Sin acceso");
+});
+
 const resources = [
   ["products", callProducts, { name: "x", price: 1000 }, undefined],
   ["clients", callClients, { name: "x" }, { name: "x" }],

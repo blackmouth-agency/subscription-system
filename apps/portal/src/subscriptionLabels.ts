@@ -23,3 +23,9 @@ export const receivers: Record<string, string> = {
   agency: "Agencia",
   partner: "Socio",
 };
+
+export const paymentMethods: Record<string, string> = {
+  transfer: "Transferencia",
+  cash: "Efectivo",
+  other: "Otro",
+};

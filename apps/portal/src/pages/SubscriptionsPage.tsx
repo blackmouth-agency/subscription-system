@@ -1,3 +1,4 @@
+import axios from "axios";
 import { useMemo, useState } from "react";
 import { createApi } from "../api";
 import { useAdminResource } from "../hooks/useAdminResource";
@@ -5,6 +6,7 @@ import type { Client } from "../organisms/ClientTable";
 import InstallmentTable, {
   type Installment,
 } from "../organisms/InstallmentTable";
+import PaymentForm, { type NewPayment } from "../organisms/PaymentForm";
 import type { Partner } from "../organisms/PartnerTable";
 import type { Product } from "../organisms/ProductTable";
 import SubscriptionForm, {
@@ -29,18 +31,16 @@ export default function SubscriptionsPage({
   accessToken: string;
   clientId?: string;
 }) {
-  const { rows, editing, setEditing, save, act, error } = useAdminResource<
-    Subscription,
-    NewSubscription
-  >(
-    clientId ? `/subscriptions?client_id=${clientId}` : "/subscriptions",
-    accessToken,
-    {
-      loadError: "No pudimos cargar las suscripciones.",
-      saveError: "No pudimos guardar la suscripción.",
-    },
-    newestFirst,
-  );
+  const { rows, editing, setEditing, save, act, reload, error } =
+    useAdminResource<Subscription, NewSubscription>(
+      clientId ? `/subscriptions?client_id=${clientId}` : "/subscriptions",
+      accessToken,
+      {
+        loadError: "No pudimos cargar las suscripciones.",
+        saveError: "No pudimos guardar la suscripción.",
+      },
+      newestFirst,
+    );
   const api = useMemo(() => createApi(accessToken), [accessToken]);
   const [history, setHistory] = useState<HistoryEntry[]>();
   const [historyError, setHistoryError] = useState("");
@@ -57,8 +57,13 @@ export default function SubscriptionsPage({
   }
   const [installments, setInstallments] = useState<Installment[]>();
   const [installmentsError, setInstallmentsError] = useState("");
-  async function showInstallments({ id }: Subscription) {
+  const [installmentsOf, setInstallmentsOf] = useState("");
+  // Una clave por intento de pago: reintentar no cobra dos veces.
+  const [paymentKey, setPaymentKey] = useState(() => crypto.randomUUID());
+  const [paymentError, setPaymentError] = useState("");
+  async function showInstallments({ id }: { id: string }) {
     try {
+      setInstallmentsOf(id);
       const { data } = await api.get<Installment[]>(
         `/subscriptions/${id}/installments`,
       );
@@ -66,6 +71,26 @@ export default function SubscriptionsPage({
       setInstallmentsError("");
     } catch {
       setInstallmentsError("No pudimos cargar las mensualidades.");
+    }
+  }
+  async function pay(payment: NewPayment) {
+    try {
+      await api.post(`/subscriptions/${installmentsOf}/payments`, payment, {
+        headers: { "Idempotency-Key": paymentKey },
+      });
+      setPaymentKey(crypto.randomUUID());
+      setPaymentError("");
+      reload();
+      await showInstallments({ id: installmentsOf });
+      return true;
+    } catch (e) {
+      // Los 409 traen la regla de negocio en español.
+      setPaymentError(
+        axios.isAxiosError(e) && e.response?.status === 409
+          ? e.response.data.message
+          : "No pudimos registrar el pago.",
+      );
+      return false;
     }
   }
   const { rows: clients } = useAdminResource<Client, never>(
@@ -112,10 +137,13 @@ export default function SubscriptionsPage({
           />
           {installmentsError && <p role="alert">{installmentsError}</p>}
           {installments && (
-            <InstallmentTable
-              installments={installments}
-              onClose={() => setInstallments(undefined)}
-            />
+            <>
+              <InstallmentTable
+                installments={installments}
+                onClose={() => setInstallments(undefined)}
+              />
+              <PaymentForm onSubmit={pay} error={paymentError} />
+            </>
           )}
           {historyError && <p role="alert">{historyError}</p>}
           {history && (

@@ -60,12 +60,14 @@ select table_privs_are('public', 'profiles', 'service_role', array[]::text[],
   'service_role no tiene permisos sobre profiles');
 
 -- Una función security definer corre con los permisos de su dueño: nadie de la API la ejecuta.
+-- Excepción: register_payment, que la API llama con el JWT y exige is_admin() adentro.
 select is_empty(
   $$ select p.proname::text
      from pg_proc p
      join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'public'
        and p.prosecdef
+       and p.proname <> 'register_payment'
        and (has_function_privilege('anon', p.oid, 'execute')
          or has_function_privilege('authenticated', p.oid, 'execute')) $$,
   'anon y authenticated no ejecutan funciones security definer de public'

@@ -19,6 +19,7 @@ export function useAdminResource<T extends Row, Body>(
   const [rows, setRows] = useState<T[]>([]);
   const [editing, setEditing] = useState<T>();
   const [error, setError] = useState("");
+  const [version, setVersion] = useState(0);
 
   const api = useMemo(() => createApi(accessToken), [accessToken]);
   const { loadError, saveError } = messages;
@@ -28,7 +29,7 @@ export function useAdminResource<T extends Row, Body>(
       .get<T[]>(path)
       .then(({ data }) => setRows(data))
       .catch(() => setError(loadError));
-  }, [api, path, loadError]);
+  }, [api, path, loadError, version]);
 
   async function save(body: Body): Promise<boolean> {
     try {
@@ -61,5 +62,8 @@ export function useAdminResource<T extends Row, Body>(
     }
   }
 
-  return { rows, editing, setEditing, save, act, error };
+  // Vuelve a pedir la lista (p. ej. tras un cambio que hizo otra ruta).
+  const reload = () => setVersion((v) => v + 1);
+
+  return { rows, editing, setEditing, save, act, reload, error };
 }
