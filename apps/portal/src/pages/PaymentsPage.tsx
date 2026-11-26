@@ -6,21 +6,18 @@ import { Alert } from "@/components/ui/alert";
 import {
   appliedCount,
   currentMonthRange,
-  filterCollections,
-  mapMonths,
   noFilters,
-  paginate,
-  summarize,
 } from "../design/lib/collections";
 import { formatMonth } from "../design/lib/format";
 import CollectionsMap, {
-  toMapRows,
   type MapRow,
 } from "../design/organisms/CollectionsMap";
 import CollectionsTable from "../design/organisms/CollectionsTable";
 import { useFitRows } from "../design/lib/useFitRows";
 import CollectionsToolbar from "../design/organisms/CollectionsToolbar";
-import CollectionTotals from "../design/organisms/CollectionTotals";
+import CollectionTotals, {
+  type Total,
+} from "../design/organisms/CollectionTotals";
 import FiltersModal from "../design/organisms/FiltersModal";
 import PaginationFooter from "../design/organisms/PaginationFooter";
 import PaymentModal, {
@@ -30,11 +27,9 @@ import PaymentModal, {
 import StatePanel from "../design/organisms/StatePanel";
 import CollectionsTemplate from "../design/templates/CollectionsTemplate";
 import type { Collection, Filters, View } from "../design/types";
-import { useAdminResource } from "../hooks/useAdminResource";
-import type { Client } from "../organisms/ClientTable";
-import type { Product } from "../organisms/ProductTable";
 
-type ApiRow = {
+// La API filtra, ordena, pagina y suma; aquí solo se pide y se pinta.
+type ListRow = {
   id: string;
   subscription_id: string;
   client_id: string;
@@ -43,21 +38,38 @@ type ApiRow = {
   product_name: string;
   due_date: string;
   amount: number;
-  display_status: string;
+  status: Collection["status"];
   paid_at: string | null;
 };
 
-// `to_activate` también se paga (la RPC lo cubre) y se muestra como
-// pendiente; `voided` no es un cobro y no se lista.
-const statusOf = (s: string) =>
-  ({
-    paid: "paid",
-    overdue: "overdue",
-    pending: "pending",
-    to_activate: "pending",
-  })[s] as Collection["status"] | undefined;
+type MapApiRow = {
+  subscription_id: string;
+  client_id: string;
+  client_name: string;
+  product_name: string;
+  months: MapRow["byMonth"] | null;
+};
 
-const toCollection = (r: ApiRow): Collection => ({
+type Page<Row> = {
+  any: boolean;
+  total: number;
+  totals: Total[];
+  rows: Row[];
+};
+
+type Payable = {
+  subscription_id: string;
+  client_name: string;
+  product_name: string;
+  installments: {
+    id: string;
+    due_date: string;
+    amount: number;
+    status: "pending" | "overdue";
+  }[];
+};
+
+const toCollection = (r: ListRow): Collection => ({
   id: r.id,
   subscriptionId: r.subscription_id,
   clientId: r.client_id,
@@ -66,23 +78,56 @@ const toCollection = (r: ApiRow): Collection => ({
   product: r.product_name,
   dueDate: r.due_date,
   amount: r.amount,
-  status: statusOf(r.display_status)!,
+  status: r.status,
   paidAt: r.paid_at,
 });
 
-const messages = { loadError: "", saveError: "" };
+const toMapRow = (r: MapApiRow): MapRow => ({
+  subscriptionId: r.subscription_id,
+  clientId: r.client_id,
+  client: r.client_name,
+  product: r.product_name,
+  byMonth: r.months ?? {},
+});
+
+const toDebtor = (p: Payable): DebtorSubscription => ({
+  id: p.subscription_id,
+  label: `${p.client_name} · ${p.product_name}`,
+  installments: p.installments.map((i) => ({
+    id: i.id,
+    label: formatMonth(i.due_date),
+    status: i.status,
+    amount: i.amount,
+  })),
+});
+
 const subscriptionsHref = "/admin/subscriptions";
+const searchDelay = 300;
+
+type Body =
+  | { kind: "list"; rows: Collection[] }
+  | { kind: "map"; rows: MapRow[]; months: string[] };
 
 type Loaded =
   | { state: "loading" }
   | { state: "error" }
-  | { state: "ready"; rows: Collection[] };
+  | {
+      state: "ready";
+      any: boolean;
+      total: number;
+      totals: Total[];
+      body: Body;
+    };
+
+type Option = { id: string; name: string };
 
 export default function PaymentsPage({ accessToken }: { accessToken: string }) {
   const api = useMemo(() => createApi(accessToken), [accessToken]);
   const [data, setData] = useState<Loaded>({ state: "loading" });
+  const [version, setVersion] = useState(0);
   const [view, setView] = useState<View>("list");
   const [query, setQuery] = useState("");
+  const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<Filters>({
     ...noFilters,
     ...currentMonthRange(),
@@ -91,44 +136,88 @@ export default function PaymentsPage({ accessToken }: { accessToken: string }) {
   const [size, setSize] = useState(10);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [payment, setPayment] = useState<{
+    debtors: DebtorSubscription[];
     subscriptionId?: string;
     count: number;
   }>();
   const [notice, setNotice] = useState("");
-  const { rows: clients } = useAdminResource<Client, never>(
-    "/clients",
-    accessToken,
-    messages,
-  );
-  const { rows: products } = useAdminResource<Product, never>(
-    "/products",
-    accessToken,
-    messages,
-  );
+  const [options, setOptions] = useState<{
+    clients: Option[];
+    products: Option[];
+  }>({ clients: [], products: [] });
 
-  const load = useCallback(() => {
-    setData({ state: "loading" });
+  useEffect(() => {
     api
-      .get<{ rows: ApiRow[] }>("/installments")
-      .then(({ data }) =>
+      .get<typeof options>("/installments/options")
+      .then(({ data }) => setOptions(data))
+      .catch(() => {}); // sin opciones el filtro queda vacío; la lista sigue
+  }, [api, version]);
+
+  // La búsqueda espera a que se deje de escribir antes de pedir.
+  useEffect(() => {
+    const timer = setTimeout(() => setSearch(query), searchDelay);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  // En escritorio las filas por página las dicta la altura disponible.
+  const fit = useFitRows(view);
+  const pageSize = fit.rows ?? size;
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const params = {
+      client_id: filters.clientId || undefined,
+      product_id: filters.productId || undefined,
+      status: filters.status || undefined,
+      q: search.trim() || undefined,
+      // En el mapa no hay fechas: siempre los últimos 12 meses.
+      from: view === "list" ? filters.from || undefined : undefined,
+      to: view === "list" ? filters.to || undefined : undefined,
+      page,
+      size: pageSize,
+    };
+    api
+      .get(view === "list" ? "/installments" : "/installments/map", {
+        params,
+        signal: controller.signal,
+      })
+      .then(({ data: d }) => {
+        const body: Body =
+          view === "list"
+            ? {
+                kind: "list",
+                rows: (d as Page<ListRow>).rows.map(toCollection),
+              }
+            : {
+                kind: "map",
+                rows: (d as Page<MapApiRow>).rows.map(toMapRow),
+                months: d.months,
+              };
+        // Una página que ya no existe (p. ej. tras filtrar) vuelve a la última.
+        if (d.rows.length === 0 && d.total > 0) {
+          return setPage(Math.ceil(d.total / pageSize));
+        }
         setData({
           state: "ready",
-          rows: data.rows
-            .filter((r) => statusOf(r.display_status))
-            .map(toCollection),
-        }),
-      )
-      .catch(() => setData({ state: "error" }));
-  }, [api]);
-  useEffect(load, [load]);
+          any: d.any,
+          total: d.total,
+          totals: d.totals,
+          body,
+        });
+      })
+      .catch((e) => {
+        if (!controller.signal.aborted && e?.code !== "ERR_CANCELED") {
+          setData({ state: "error" });
+        }
+      });
+    return () => controller.abort();
+  }, [api, view, filters, search, page, pageSize, version]);
 
-  const all = useMemo(() => (data.state === "ready" ? data.rows : []), [data]);
-  const found = useMemo(
-    () => filterCollections(all, filters, query, view),
-    [all, filters, query, view],
-  );
-  const totals = useMemo(() => summarize(found), [found]);
-  const applied = appliedCount(filters, view);
+  const reload = useCallback(() => setVersion((v) => v + 1), []);
+  const retry = () => {
+    setData({ state: "loading" });
+    reload();
+  };
 
   // Cada cambio de lo que se ve devuelve a la página 1.
   const reset =
@@ -138,46 +227,20 @@ export default function PaymentsPage({ accessToken }: { accessToken: string }) {
       setPage(1);
     };
 
-  const sorted = useMemo(
-    () => [...found].sort((a, b) => b.dueDate.localeCompare(a.dueDate)),
-    [found],
-  );
-  const mapRows = useMemo(() => toMapRows(found), [found]);
-  const total = view === "list" ? sorted.length : mapRows.length;
-  // En escritorio las filas por página las dicta la altura disponible.
-  const fit = useFitRows(view);
-  const pageSize = fit.rows ?? size;
-  const current = Math.min(page, Math.max(1, Math.ceil(total / pageSize)));
-
-  // Suscripciones con deuda, con sus mensualidades de la más antigua a la
-  // más nueva (es el orden en que la RPC las cubre).
-  const debtors = useMemo(() => {
-    const by = new Map<string, DebtorSubscription>();
-    for (const r of [...all].sort((a, b) =>
-      a.dueDate.localeCompare(b.dueDate),
-    )) {
-      if (r.status === "paid") continue;
-      const s = by.get(r.subscriptionId) ?? {
-        id: r.subscriptionId,
-        label: `${r.client} · ${r.product}`,
-        installments: [],
-      };
-      s.installments.push({
-        id: r.id,
-        label: formatMonth(r.dueDate),
-        status: r.status,
-        amount: r.amount,
-      });
-      by.set(r.subscriptionId, s);
+  // Las mensualidades por pagar se piden al abrir: siempre al día.
+  async function openPayment(subscriptionId?: string, installmentId?: string) {
+    try {
+      const { data: rows } = await api.get<Payable[]>("/installments/payable");
+      const debtors = rows.map(toDebtor);
+      const index =
+        debtors
+          .find((d) => d.id === subscriptionId)
+          ?.installments.findIndex((i) => i.id === installmentId) ?? 0;
+      setPayment({ debtors, subscriptionId, count: Math.max(index, 0) + 1 });
+    } catch {
+      setNotice("No pudimos cargar las mensualidades por pagar.");
     }
-    return [...by.values()].sort((a, b) => a.label.localeCompare(b.label));
-  }, [all]);
-
-  const openPayment = (row: Collection) => {
-    const debt = debtors.find((d) => d.id === row.subscriptionId);
-    const index = debt?.installments.findIndex((i) => i.id === row.id) ?? 0;
-    setPayment({ subscriptionId: row.subscriptionId, count: index + 1 });
-  };
+  }
 
   async function pay(p: PaymentSubmit) {
     try {
@@ -196,17 +259,24 @@ export default function PaymentsPage({ accessToken }: { accessToken: string }) {
     }
     setPayment(undefined);
     setNotice("Registramos el pago.");
-    load();
+    reload();
   }
 
   const clearAll = () => {
     setFilters({ ...noFilters });
     setQuery("");
+    setSearch("");
     setPage(1);
   };
 
   const detailHref = (row: { clientId: string }) =>
     `${subscriptionsHref}?client_id=${row.clientId}`;
+
+  const ready = data.state === "ready" ? data : undefined;
+  const applied = appliedCount(filters, view);
+  const matches = ready ? ready.totals.reduce((n, t) => n + t.count, 0) : 0;
+  const total = ready?.total ?? 0;
+  const current = Math.min(page, Math.max(1, Math.ceil(total / pageSize)));
 
   let card;
   if (data.state === "loading") {
@@ -219,14 +289,14 @@ export default function PaymentsPage({ accessToken }: { accessToken: string }) {
           title="No pudimos cargar los cobros"
           text="Revisa tu conexión. No se perdió ningún dato."
           action={
-            <Button variant="secondary" onClick={load}>
+            <Button variant="secondary" onClick={retry}>
               Reintentar
             </Button>
           }
         />
       </div>
     );
-  } else if (all.length === 0) {
+  } else if (!data.any) {
     card = (
       <StatePanel
         kind="empty"
@@ -243,6 +313,7 @@ export default function PaymentsPage({ accessToken }: { accessToken: string }) {
       />
     );
   } else {
+    const { body } = data;
     card = (
       <>
         <CollectionsToolbar
@@ -269,15 +340,12 @@ export default function PaymentsPage({ accessToken }: { accessToken: string }) {
             ref={fit.ref}
             className="min-h-0 flex-1 min-[861px]:overflow-hidden"
           >
-            {view === "list" ? (
-              <CollectionsTable
-                rows={paginate(sorted, current, pageSize)}
-                clientHref={detailHref}
-              />
+            {body.kind === "list" ? (
+              <CollectionsTable rows={body.rows} clientHref={detailHref} />
             ) : (
               <CollectionsMap
-                rows={paginate(mapRows, current, pageSize)}
-                months={mapMonths()}
+                rows={body.rows}
+                months={body.months}
                 onPay={openPayment}
                 onOpen={(row: MapRow) =>
                   window.location.assign(detailHref(row))
@@ -302,8 +370,8 @@ export default function PaymentsPage({ accessToken }: { accessToken: string }) {
   return (
     <CollectionsTemplate
       action={
-        data.state === "ready" && all.length > 0 ? (
-          <Button onClick={() => setPayment({ count: 1 })}>
+        ready?.any ? (
+          <Button onClick={() => openPayment()}>
             <Plus aria-hidden="true" strokeWidth={1.6} className="size-4.5" />
             Registrar pago
           </Button>
@@ -313,7 +381,7 @@ export default function PaymentsPage({ accessToken }: { accessToken: string }) {
       totals={
         data.state === "error" ? undefined : (
           <CollectionTotals
-            totals={totals}
+            totals={ready?.totals ?? []}
             loading={data.state === "loading"}
           />
         )
@@ -324,15 +392,18 @@ export default function PaymentsPage({ accessToken }: { accessToken: string }) {
         open={filtersOpen}
         view={view}
         filters={filters}
-        products={products.map((p) => ({ value: p.id, label: p.name }))}
-        clients={clients.map((c) => ({ value: c.id, label: c.name }))}
-        matches={found.length}
+        products={options.products.map((p) => ({
+          value: p.id,
+          label: p.name,
+        }))}
+        clients={options.clients.map((c) => ({ value: c.id, label: c.name }))}
+        matches={matches}
         onChange={reset(setFilters)}
         onClose={() => setFiltersOpen(false)}
       />
       <PaymentModal
         open={payment !== undefined}
-        subscriptions={debtors}
+        subscriptions={payment?.debtors ?? []}
         subscriptionId={payment?.subscriptionId}
         count={payment?.count}
         onSubmit={pay}

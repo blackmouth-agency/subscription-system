@@ -11,7 +11,7 @@ export type MapRow = {
   client: string;
   product: string;
   // `YYYY-MM` -> mensualidad de ese mes
-  byMonth: Record<string, Collection | undefined>;
+  byMonth: Record<string, Pick<Collection, "id" | "status"> | undefined>;
 };
 
 // Una fila por suscripción; el orden de las filas lo decide quien llama.
@@ -43,7 +43,7 @@ export default function CollectionsMap({
 }: {
   rows: MapRow[];
   months: string[];
-  onPay: (row: Collection) => void;
+  onPay: (subscriptionId: string, installmentId: string) => void;
   onOpen: (row: MapRow) => void;
 }) {
   return (
@@ -95,7 +95,10 @@ export default function CollectionsMap({
                       aria-label={label}
                       disabled={!c}
                       onClick={() =>
-                        c && (c.status === "paid" ? onOpen(row) : onPay(c))
+                        c &&
+                        (c.status === "paid"
+                          ? onOpen(row)
+                          : onPay(row.subscriptionId, c.id))
                       }
                       className={cx(
                         "mx-auto grid size-9 place-items-center",

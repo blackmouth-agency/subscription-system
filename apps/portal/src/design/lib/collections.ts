@@ -1,5 +1,4 @@
 import type { Collection, Filters, View } from "../types";
-import { normalizeText } from "./format";
 
 export const noFilters: Filters = {
   status: "",
@@ -34,26 +33,7 @@ export function appliedCount(f: Filters, view: View) {
   return fields + (view === "list" && (f.from || f.to) ? 1 : 0);
 }
 
-export function filterCollections(
-  rows: Collection[],
-  f: Filters,
-  query: string,
-  view: View,
-) {
-  const q = normalizeText(query.trim());
-  const months = view === "map" ? mapMonths() : [];
-  return rows.filter(
-    (r) =>
-      (!q || normalizeText(r.client).includes(q)) &&
-      (!f.status || r.status === f.status) &&
-      (!f.productId || r.productId === f.productId) &&
-      (!f.clientId || r.clientId === f.clientId) &&
-      (view === "map"
-        ? months.includes(r.dueDate.slice(0, 7))
-        : (!f.from || r.dueDate >= f.from) && (!f.to || r.dueDate <= f.to)),
-  );
-}
-
+// Solo para la galería: en el portal filtra y suma la API.
 export function summarize(rows: Collection[]) {
   const total = rows.reduce((t, r) => t + r.amount, 0);
   return (["paid", "pending", "overdue"] as const).map((status) => {

@@ -2,7 +2,6 @@ import { createFactory } from "hono/factory";
 import { HTTPException } from "hono/http-exception";
 import { adminDb } from "../../shared/admin-db.ts";
 import { crudService } from "../../shared/crud.ts";
-import { bogotaToday, displayStatus } from "../../shared/installments.ts";
 
 type Subscription = {
   id: string;
@@ -100,23 +99,17 @@ const authorizeAndListInstallments = installmentsFactory.createMiddleware(
     const { authorization, apikey } = c.req.valid("header" as never);
     const { id } = c.req.valid("param" as never);
     const db = await adminDb(authorization, apikey);
-    const { data: sub } = await db.from("subscriptions").select("status")
+    const { data: sub } = await db.from("subscriptions").select("id")
       .eq("id", id);
     if (!sub?.length) {
       throw new HTTPException(404, { message: "Suscripción no encontrada" });
     }
-    const { data, error } = await db.from("installments").select("*")
-      .eq("subscription_id", id).order("due_date");
+    // El estado visible lo calcula la base (única fuente de la gracia).
+    const { data, error } = await db.rpc("list_subscription_installments", {
+      p_subscription_id: id,
+    });
     if (error) throw new HTTPException(500, { message: "Error interno." });
-    const today = bogotaToday();
-    const cancelled = sub[0].status === "cancelled";
-    c.set(
-      "installments",
-      data.map((i) => ({
-        ...i,
-        display_status: displayStatus(i, cancelled, today),
-      })),
-    );
+    c.set("installments", data as unknown as unknown[]);
     await next();
   },
 );

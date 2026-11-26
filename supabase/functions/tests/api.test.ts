@@ -699,12 +699,15 @@ for (const [resource, callResource, body, patch] of resources) {
   });
 }
 
-Deno.test("cobros: lista con filtros, receptor, reparto y totales", async () => {
+const bogotaToday = () =>
+  new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
+
+Deno.test("cobros: lista con filtros, búsqueda, páginas y totales", async () => {
   const token = await signInNewUser(true);
   const post = async (call: typeof callClients, body: unknown) =>
     await (await call(token, "POST", "", body)).json();
   const client = await post(callClients, { name: "A" });
-  const other = await post(callClients, { name: "B" });
+  const other = await post(callClients, { name: "Éb" });
   const p1 = await post(callProducts, { name: "P1", price: 50000 });
   const p2 = await post(callProducts, { name: "P2", price: 20000 });
   const sub = (client_id: string, product_id: string, price: number) =>
@@ -723,9 +726,7 @@ Deno.test("cobros: lista con filtros, receptor, reparto y totales", async () => 
     (${s2}, '2099-01-10', 20000, 'pending'),
     (${s3}, '2026-01-10', 50000, 'pending')`;
   await sql.end();
-  const today = new Date().toLocaleDateString("en-CA", {
-    timeZone: "America/Bogota",
-  });
+  const today = bogotaToday();
   const paid = await fetch(`${apiRoot}/subscriptions/${s1}/payments`, {
     method: "POST",
     headers: {
@@ -740,7 +741,14 @@ Deno.test("cobros: lista con filtros, receptor, reparto y totales", async () => 
   await paid.body?.cancel();
 
   type Out = {
-    totals: { collected: number; commission: number; agency: number };
+    any: boolean;
+    total: number;
+    totals: {
+      status: string;
+      amount: number;
+      count: number;
+      percent: number;
+    }[];
     rows: Record<string, unknown>[];
   };
   const list = async (qs: string): Promise<Out> =>
@@ -750,24 +758,28 @@ Deno.test("cobros: lista con filtros, receptor, reparto y totales", async () => 
   const mine = `client_id=${client.id}`;
 
   const all = await list(mine);
-  assertEquals(all.rows.length, 3);
+  assertEquals(all.any, true);
+  assertEquals(all.total, 3);
   // Más reciente primero.
   assertEquals(all.rows.map((r) => r.due_date), [
     "2099-01-10",
     "2026-02-10",
     "2026-01-10",
   ]);
+  assertEquals(all.rows.map((r) => r.status), ["pending", "overdue", "paid"]);
   const first = all.rows[2];
-  assertEquals(first.display_status, "paid");
-  assertEquals(first.receiver, "agency");
   assertEquals(first.paid_at, today);
   assertEquals(first.client_name, "A");
   assertEquals(first.product_name, "P1");
-  assertEquals(
-    [first.commission_amount, first.agency_amount],
-    [0, 50000],
-  );
-  assertEquals(all.totals, { collected: 50000, commission: 0, agency: 50000 });
+  assertEquals(first.client_id, client.id);
+  assertEquals(first.product_id, p1.id);
+  // La lista no lleva datos que el portal no usa.
+  assertEquals("receiver" in first, false);
+  assertEquals(all.totals, [
+    { status: "paid", amount: 50000, count: 1, percent: 42 },
+    { status: "pending", amount: 20000, count: 1, percent: 17 },
+    { status: "overdue", amount: 50000, count: 1, percent: 42 },
+  ]);
 
   assertEquals((await list(`${mine}&product_id=${p2.id}`)).rows.length, 1);
   assertEquals((await list(`${mine}&status=overdue`)).rows.length, 1);
@@ -777,36 +789,132 @@ Deno.test("cobros: lista con filtros, receptor, reparto y totales", async () => 
     (await list(`${mine}&from=2026-01-10&to=2026-02-10`)).rows.length,
     2,
   );
-  // Los totales siguen al filtro.
+  // Los totales siguen al filtro, no a la página.
+  const overdue = await list(`${mine}&status=overdue`);
+  assertEquals(overdue.totals[2], {
+    status: "overdue",
+    amount: 50000,
+    count: 1,
+    percent: 100,
+  });
+  assertEquals(overdue.totals[0].count, 0);
+  const paged = await list(`${mine}&size=2&page=2`);
+  assertEquals(paged.rows.length, 1);
+  assertEquals(paged.total, 3);
+  assertEquals(paged.totals, all.totals);
+  assertEquals((await list(`${mine}&size=2&page=9`)).rows, []);
+  // La búsqueda ignora mayúsculas y acentos.
+  assertEquals((await list(`client_id=${other.id}&q=EB`)).rows.length, 1);
+  assertEquals((await list(`client_id=${other.id}&q=zz`)).rows.length, 0);
+  assertEquals((await list(`${mine}&q=%20a%20`)).rows.length, 3);
   assertEquals(
-    (await list(`${mine}&status=overdue`)).totals,
-    { collected: 0, commission: 0, agency: 0 },
-  );
-  assertEquals(
-    (await list(`client_id=${other.id}`)).rows[0].display_status,
+    (await list(`client_id=${other.id}`)).rows[0].status,
     "overdue",
   );
-  assertEquals(
-    (await list(`client_id=${crypto.randomUUID()}`)).rows,
-    [],
-  );
+  const none = await list(`client_id=${crypto.randomUUID()}`);
+  assertEquals(none.rows, []);
+  assertEquals(none.any, true);
 
   for (
-    const qs of ["from=2026-02-01&to=2026-01-01", "client_id=x", "status=x"]
+    const qs of [
+      "from=2026-02-01&to=2026-01-01",
+      "client_id=x",
+      "status=x",
+      "status=voided",
+      "page=0",
+      "size=0",
+      "size=101",
+    ]
   ) {
     const bad = await fetch(`${apiRoot}/installments?${qs}`, {
       headers: { apikey: publishableKey, authorization: `Bearer ${token}` },
     });
-    assertEquals(bad.status, 400);
+    assertEquals(bad.status, 400, qs);
     await bad.body?.cancel();
   }
 
-  const forbidden = await fetch(`${apiRoot}/installments`, {
-    headers: {
-      apikey: publishableKey,
-      authorization: `Bearer ${await signInNewUser(false)}`,
-    },
+  const noAdmin = await signInNewUser(false);
+  for (const path of ["", "/map", "/payable", "/options"]) {
+    const forbidden = await fetch(`${apiRoot}/installments${path}`, {
+      headers: { apikey: publishableKey, authorization: `Bearer ${noAdmin}` },
+    });
+    assertEquals(forbidden.status, 403, path);
+    await forbidden.body?.cancel();
+  }
+});
+
+Deno.test("cobros: mapa, mensualidades por pagar y opciones", async () => {
+  const token = await signInNewUser(true);
+  const headers = {
+    apikey: publishableKey,
+    authorization: `Bearer ${token}`,
+    "content-type": "application/json",
+  };
+  const post = async (call: typeof callClients, body: unknown) =>
+    await (await call(token, "POST", "", body)).json();
+  const client = await post(callClients, { name: "Ñu" });
+  const product = await post(callProducts, { name: "Mapa", price: 30000 });
+  const subId: string = (await post(callSubscriptions, {
+    client_id: client.id,
+    product_id: product.id,
+    price: 30000,
+  })).id;
+  const today = bogotaToday();
+  const old = new Date(Date.parse(today) - 40 * 86_400_000).toISOString()
+    .slice(0, 10);
+  const { default: postgres } = await import("postgres");
+  const sql = postgres(Deno.env.get("DB_URL")!);
+  await sql`insert into public.installments (subscription_id, due_date, amount, status) values
+    (${subId}, ${old}, 30000, 'pending'),
+    (${subId}, ${today}, 30000, 'pending')`;
+  await sql.end();
+  const get = async (path: string) =>
+    await (await fetch(`${apiRoot}/installments${path}`, { headers })).json();
+
+  type Debt = { id: string; due_date: string; amount: number; status: string };
+  const payable = async () =>
+    (await get("/payable")).find((p: { subscription_id: string }) =>
+      p.subscription_id === subId
+    );
+  const debt = await payable();
+  assertEquals(debt.client_name, "Ñu");
+  assertEquals(debt.product_name, "Mapa");
+  assertEquals(
+    debt.installments.map((i: Debt) => [i.due_date, i.amount, i.status]),
+    [[old, 30000, "overdue"], [today, 30000, "pending"]],
+  );
+
+  const map = await get(`/map?client_id=${client.id}`);
+  assertEquals(map.months.length, 12);
+  assertEquals(map.months[11], today.slice(0, 7));
+  assertEquals(map.total, 1);
+  assertEquals(map.rows[0].client_name, "Ñu");
+  assertEquals(map.rows[0].product_name, "Mapa");
+  assertEquals(map.rows[0].months[today.slice(0, 7)].status, "pending");
+  assertEquals(
+    map.totals.reduce((n: number, t: { count: number }) => n + t.count, 0),
+    2,
+  );
+  assertEquals((await get(`/map?client_id=${client.id}&q=zz`)).rows, []);
+
+  const options = await get("/options");
+  assertEquals(
+    options.clients.some((c: { id: string }) => c.id === client.id),
+    true,
+  );
+  assertEquals(
+    options.products.some((p: { id: string }) => p.id === product.id),
+    true,
+  );
+
+  // Pagar la más antigua la saca de las mensualidades por pagar.
+  const pay = await fetch(`${apiRoot}/subscriptions/${subId}/payments`, {
+    method: "POST",
+    headers: { ...headers, "idempotency-key": crypto.randomUUID() },
+    body: JSON.stringify({ amount: 30000, paid_at: today, method: "cash" }),
   });
-  assertEquals(forbidden.status, 403);
-  await forbidden.body?.cancel();
+  assertEquals(pay.status, 201);
+  await pay.body?.cancel();
+  const after = await payable();
+  assertEquals(after.installments.map((i: Debt) => i.due_date), [today]);
 });
