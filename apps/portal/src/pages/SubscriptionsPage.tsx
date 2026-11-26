@@ -1,3 +1,4 @@
+import { uuid } from "../design/lib/uuid";
 import axios from "axios";
 import { useMemo, useState } from "react";
 import { createApi } from "../api";
@@ -59,7 +60,7 @@ export default function SubscriptionsPage({
   const [installmentsError, setInstallmentsError] = useState("");
   const [installmentsOf, setInstallmentsOf] = useState("");
   // Una clave por intento de pago: reintentar no cobra dos veces.
-  const [paymentKey, setPaymentKey] = useState(() => crypto.randomUUID());
+  const [paymentKey, setPaymentKey] = useState(() => uuid());
   const [paymentError, setPaymentError] = useState("");
   async function showInstallments({ id }: { id: string }) {
     try {
@@ -78,7 +79,7 @@ export default function SubscriptionsPage({
       await api.post(`/subscriptions/${installmentsOf}/payments`, payment, {
         headers: { "Idempotency-Key": paymentKey },
       });
-      setPaymentKey(crypto.randomUUID());
+      setPaymentKey(uuid());
       setPaymentError("");
       reload();
       await showInstallments({ id: installmentsOf });
