@@ -41,14 +41,14 @@ export default function PaginationFooter({
       <div
         className={cx(
           "flex flex-wrap items-center justify-between",
-          "gap-x-4 gap-y-2",
+          "gap-x-4 gap-y-2 movil:flex-nowrap",
         )}
       >
-        <span className="num">
+        <span className="num whitespace-nowrap">
           Mostrando {from}–{to} de {total}
         </span>
         {onSize && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 movil:hidden">
             <label htmlFor={id}>Filas por página</label>
             <NativeSelect
               id={id}
