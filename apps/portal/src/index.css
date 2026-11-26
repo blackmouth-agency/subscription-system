@@ -1,111 +1,388 @@
-:root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
-
-  --sans: system-ui, "Segoe UI", Roboto, sans-serif;
-  --heading: system-ui, "Segoe UI", Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
-
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
-}
-
-@media (prefers-color-scheme: dark) {
+@layer theme, base, legacy, components, utilities;
+/* Diseño del portal: cinco colores (fondo, superficie, tinta, azul y óxido);
+   lo demás es mezcla. El nodo es una mensualidad: tinta pagada, azul en curso,
+   óxido vencida. Se estilan los elementos, no las páginas. */
+@import url("https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Inter:opsz,wght@14..32,400..600&display=swap");
+@layer legacy {
   :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
+    color-scheme: light dark;
+    --fondo: light-dark(#f4f4f4, #0a0a0a);
+    --superficie: light-dark(#fff, #161616);
+    --tinta: light-dark(#0d0d0d, #f5f5f5);
+    --azul: light-dark(#0a45e6, #7aa5ff);
+    --oxido: light-dark(#b0380f, #ff9469);
+    --tenue: color-mix(in srgb, var(--tinta) 68%, var(--superficie));
+    --borde: light-dark(#8a8a8a, #707070);
+    --linea: color-mix(in srgb, var(--tinta) 10%, var(--superficie));
+    --realce: color-mix(in srgb, var(--tinta) 8%, var(--superficie));
+    --azul-tinte: color-mix(in srgb, var(--azul) 13%, var(--superficie));
+    --oxido-tinte: color-mix(in srgb, var(--oxido) 13%, var(--superficie));
+    --hecho: color-mix(in srgb, var(--tinta) 72%, var(--superficie));
+    font:
+      14px/20px Inter,
+      system-ui,
+      "Segoe UI",
+      sans-serif;
+    color: var(--tinta);
+    background: var(--fondo);
+    -webkit-font-smoothing: antialiased;
   }
 
-  #social .button-icon {
-    filter: invert(1) brightness(2);
+  *,
+  ::before,
+  ::after {
+    box-sizing: border-box;
   }
-}
-
-#root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-}
-
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
-}
-
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
+  body {
+    margin: 0;
   }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
+  h1,
+  h2,
+  p,
+  dl,
+  dd {
+    margin: 0;
   }
-}
-p {
-  margin: 0;
-}
+  h1 {
+    font-size: 24px;
+    line-height: 30px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  h1 img {
+    width: 1.5em;
+    height: 1.5em;
+    object-fit: cover;
+    border: 2px solid currentColor;
+    border-radius: 8px;
+  }
+  .sala h1 {
+    justify-content: center;
+  }
+  h2 {
+    font-size: 15px;
+    line-height: 20px;
+    font-weight: 600;
+  }
+  :focus-visible {
+    outline: 2px solid var(--azul);
+    outline-offset: 2px;
+  }
+  ::placeholder {
+    color: var(--tenue);
+    opacity: 1;
+  }
 
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
+  /* Átomos */
+  button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 38px;
+    padding: 0 14px;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    font: inherit;
+    font-weight: 500;
+    color: inherit;
+    background: var(--realce);
+    cursor: pointer;
+  }
+  button:hover {
+    background: color-mix(in srgb, var(--tinta) 14%, var(--superficie));
+  }
+  button[type="submit"] {
+    color: var(--fondo);
+    background: var(--tinta);
+  }
+  button[type="submit"]:hover {
+    background: color-mix(in srgb, var(--tinta) 86%, var(--fondo));
+  }
+  button:disabled {
+    color: var(--tenue);
+    background: var(--realce);
+    cursor: not-allowed;
+  }
+  button.enlace {
+    min-height: 0;
+    padding: 0;
+    font-weight: 400;
+    color: var(--tenue);
+    text-decoration: underline;
+    text-decoration-color: var(--borde);
+    text-underline-offset: 4px;
+    background: none;
+  }
+  button.enlace:hover {
+    color: var(--tinta);
+    background: none;
+  }
+  input,
+  select,
+  textarea {
+    width: 100%;
+    min-height: 40px;
+    padding: 8px 12px;
+    border: 1px solid var(--borde);
+    border-radius: 10px;
+    font: inherit;
+    color: var(--tinta);
+    background: var(--superficie);
+  }
+  input[type="checkbox"] {
+    width: 18px;
+    min-height: 18px;
+    accent-color: var(--tinta);
+  }
+  input:read-only {
+    color: var(--tenue);
+  }
+  label {
+    font-weight: 500;
+  }
+  a {
+    color: inherit;
+  }
+  [role="alert"]:empty {
+    display: none;
+  }
+  [role="alert"] {
+    font-size: 13px;
+    color: var(--oxido);
+  }
+  p[role="status"] {
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: var(--realce);
+  }
+  p[role="status"]:empty {
+    display: none;
+  }
 
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
+  /* Formularios: una tarjeta; la etiqueta queda pegada a su campo. */
+  form {
+    display: grid;
+    align-content: start;
+    gap: 8px;
+    padding: 24px;
+    border-radius: 14px;
+    background: var(--superficie);
+  }
+  form > label:not(:first-child) {
+    margin-top: 8px;
+  }
+  form > button[type="submit"] {
+    margin-top: 12px;
+  }
+
+  /* Organismos */
+  .campo {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  /* Tabla; angosta, pasa a desplazarse en su marco. */
+  .tabla-marco {
+    overflow-x: auto;
+  }
+  .tabla {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .tabla :is(th, td) {
+    padding: 10px 12px;
+    text-align: left;
+    vertical-align: middle;
+  }
+  .tabla :is(th, td):first-child {
+    padding-left: 20px;
+  }
+  .tabla :is(th, td):last-child {
+    padding-right: 20px;
+  }
+  .tabla th {
+    font-size: 12px;
+    font-weight: 400;
+    white-space: nowrap;
+    color: var(--tenue);
+  }
+  .tabla td {
+    height: 54px;
+    border-top: 1px solid var(--linea);
+  }
+  .tabla tbody tr:hover td {
+    background: color-mix(in srgb, var(--tinta) 3%, var(--superficie));
+  }
+  .vacio {
+    padding: 44px 24px 52px;
+    text-align: center;
+    color: var(--tenue);
+  }
+
+  /* Plantilla de administración: barra lateral y contenido. */
+  .marco {
+    display: grid;
+    grid-template-columns: 200px minmax(0, 1fr);
+    gap: 24px;
+    align-items: start;
+    padding: 24px;
+  }
+  .marco > aside {
+    position: sticky;
+    top: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    height: calc(100svh - 48px);
+  }
+  .marco > aside h1 {
+    min-height: 44px;
+    padding: 0 10px;
+    font-size: 18px;
+    line-height: 22px;
+  }
+  .marco > aside h1 img {
+    flex: none;
+    width: 44px;
+    height: 44px;
+  }
+  .marco > aside h1 small {
+    display: block;
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 400;
+    letter-spacing: 0;
+    color: var(--tenue);
+  }
+  .marco nav {
+    display: grid;
+    gap: 2px;
+  }
+  .marco nav a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 38px;
+    padding: 0 10px;
+    border-radius: 10px;
+    text-decoration: none;
+    color: var(--tenue);
+  }
+  .marco nav a:hover {
+    color: var(--tinta);
+  }
+  .marco nav a[aria-current="page"] {
+    font-weight: 500;
+    color: var(--tinta);
+    background: color-mix(in srgb, var(--tinta) 9%, var(--fondo));
+  }
+  .usuario {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: auto;
+    padding: 10px;
+    border-radius: 14px;
+    background: var(--superficie);
+  }
+  .usuario svg:first-child {
+    flex: none;
+  }
+  .usuario span {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    font-size: 12px;
+    line-height: 17px;
+    text-overflow: ellipsis;
+    color: var(--tenue);
+  }
+  .usuario > button:first-child {
+    flex: 1;
+    justify-content: flex-start;
+    gap: 10px;
+    min-width: 0;
+    min-height: 32px;
+    padding: 0;
+    background: none;
+  }
+  .usuario > button:last-child {
+    flex: none;
+    width: 32px;
+    min-height: 32px;
+    padding: 0;
+    border-radius: 8px;
+  }
+  .columna {
+    display: grid;
+    gap: 16px;
+    min-width: 0;
+  }
+
+  /* Inicio de sesión: el formulario centrado sobre el fondo. */
+  .sala {
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 16px;
+    min-height: 100svh;
+    padding: 40px 16px;
+  }
+  .sala h1 {
+    font-size: 40px;
+    line-height: 44px;
+    letter-spacing: -0.035em;
+    text-align: center;
+  }
+  .sala > form {
+    width: min(480px, 100%);
+    padding: 40px;
+  }
+  .sala input,
+  .sala button[type="submit"] {
+    min-height: 46px;
+  }
+  .sala > p[role="status"] {
+    width: min(480px, 100%);
+  }
+
+  .contenido {
+    display: grid;
+    align-content: start;
+  }
+  /* Sin la plantilla de administración, la pantalla mínima conserva aire. */
+  .contenido:not(:has(.marco)) {
+    gap: 16px;
+    padding: 12px;
+  }
+  .contenido > p[role="status"] {
+    justify-self: start;
+  }
+
+  @media (max-width: 860px) {
+    .marco {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .marco > aside {
+      position: static;
+      height: auto;
+    }
+    .marco nav {
+      grid-auto-flow: column;
+      overflow-x: auto;
+    }
+    .sala > form {
+      padding: 24px 20px;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      transition: none !important;
+      animation: none !important;
+    }
+  }
 }
