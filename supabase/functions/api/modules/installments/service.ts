@@ -14,6 +14,8 @@ type Row = {
   payment: { paid_at: string; receiver: string } | null;
   subscription: {
     status: string;
+    client_id: string;
+    product_id: string;
     client: { name: string };
     product: { name: string };
   };
@@ -65,7 +67,9 @@ const authorizeAndList = factory.createMiddleware(async (c, next) => {
     rows: rows.map((r) => ({
       id: r.id,
       subscription_id: r.subscription_id,
+      client_id: r.subscription.client_id,
       client_name: r.subscription.client.name,
+      product_id: r.subscription.product_id,
       product_name: r.subscription.product.name,
       due_date: r.due_date,
       amount: r.amount,
