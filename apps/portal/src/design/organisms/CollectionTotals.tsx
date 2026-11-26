@@ -101,9 +101,7 @@ export default function CollectionTotals({
                 </>
               ) : (
                 <>
-                  <p className="num text-cifra">
-                    {formatCop(t.amount)}
-                  </p>
+                  <p className="num text-cifra">{formatCop(t.amount)}</p>
                   <p className="text-pequeno text-tenue">
                     <span className="num">{t.count}</span>{" "}
                     {t.count === 1 ? "mensualidad" : "mensualidades"}
