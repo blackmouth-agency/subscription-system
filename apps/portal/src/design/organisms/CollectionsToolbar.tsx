@@ -60,12 +60,14 @@ export default function CollectionsToolbar({
             ))}
           </ul>
         )}
-        <ViewSelect
-          label="Vista"
-          value={view}
-          options={views}
-          onChange={(v) => onView(v as View)}
-        />
+        <div className="max-[860px]:hidden">
+          <ViewSelect
+            label="Vista"
+            value={view}
+            options={views}
+            onChange={(v) => onView(v as View)}
+          />
+        </div>
       </div>
     </header>
   );
