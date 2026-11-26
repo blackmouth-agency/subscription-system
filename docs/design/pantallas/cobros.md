@@ -10,7 +10,7 @@ Template Admin · Totales · Barra de herramientas · Buscador · Botón de filt
 2. **Totales** (tres tarjetas en fila, encima de la tarjeta principal): Cobrado · Pendiente · Vencido. Cada una: anillo con el porcentaje del color del estado, importe mono y «N mensualidades». Reaccionan a la búsqueda y a los filtros.
 3. **Tarjeta principal**
    - Barra: `[Lista | Mapa]` (chips) · en el mapa, la leyenda Pagada/Pendiente/Vencida · a la derecha `[buscador de clientes][ícono de filtros con insignia]`.
-   - **Lista**: tabla Cliente (enlace + producto) · Vence (mono; «pagada <fecha>» debajo si aplica) · Monto · Estado (insignia) · Acciones («Registrar pago», oculto si ya está pagada). Orden: vencimiento descendente. Pie: paginación + nota «El registro no es constancia de transferencia.».
+   - **Lista**: tabla Cliente (enlace + producto) · Vence (mono; «pagada <fecha>» debajo si aplica) · Monto · Estado (insignia) · Acciones («Registrar pago», oculto si ya está pagada). Orden: vencimiento descendente. Pie: paginación.
    - **Mapa**: filas = suscripciones (cliente + producto), columnas = 12 meses, cada celda un nodo-botón. Pendiente/vencida abre «Registrar pago»; las demás llevan al detalle. Con paginación de filas.
 
 ## Filtros (modal «Filtrar cobros»)

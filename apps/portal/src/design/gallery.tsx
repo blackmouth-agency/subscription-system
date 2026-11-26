@@ -276,11 +276,6 @@ function Organisms() {
             page={page}
             size={size}
             total={total}
-            note={
-              view === "list"
-                ? "El registro no es constancia de transferencia."
-                : undefined
-            }
             onPage={setPage}
             onSize={(n) => {
               setSize(n);

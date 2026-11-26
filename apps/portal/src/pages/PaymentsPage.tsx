@@ -291,11 +291,6 @@ export default function PaymentsPage({ accessToken }: { accessToken: string }) {
             page={current}
             size={pageSize}
             total={total}
-            note={
-              view === "list"
-                ? "El registro no es constancia de transferencia."
-                : undefined
-            }
             onPage={setPage}
             onSize={fit.rows ? undefined : reset(setSize)}
           />

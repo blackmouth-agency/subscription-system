@@ -50,8 +50,6 @@ test("el admin ve los cobros, filtra, busca y registra un pago", async ({
   await expect(page.getByRole("row", { name: new RegExp(b) }))
     .toContainText("Pendiente");
   await search.fill("");
-  await expect(page.getByText("no es constancia de transferencia"))
-    .toBeVisible();
   await expect(page.getByText("Cobrado", { exact: true })).toBeVisible();
   // En escritorio la página cabe en la ventana: sin barras de scroll.
   const overflow = await page.evaluate(() => ({
