@@ -39,7 +39,7 @@ function DialogOverlay({
   );
 }
 
-// 480 px; en móvil se pega cerca del borde superior. `data-design` aísla el
+// 480 px, centrado también en móvil. `data-design` aísla el
 // contenido de las hojas globales del portal (ver `design.css`).
 function DialogContent({
   className,
@@ -57,7 +57,7 @@ function DialogContent({
           "fixed top-1/2 left-1/2 z-50 grid w-120 max-w-[calc(100vw-2rem)]",
           "-translate-x-1/2 -translate-y-1/2 gap-4 rounded-tarjeta",
           "bg-popover p-6 text-popover-foreground shadow-modal",
-          "movil:top-4 movil:translate-y-0 movil:p-5",
+          "movil:p-5",
           "max-h-[calc(100dvh-2rem)] overflow-y-auto",
           "data-[state=open]:animate-in data-[state=open]:fade-in-0",
           "data-[state=closed]:animate-out data-[state=closed]:fade-out-0",
