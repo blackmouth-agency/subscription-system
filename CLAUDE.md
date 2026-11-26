@@ -32,6 +32,8 @@
 
 ## Frontend (Atomic Design)
 - Carpetas en `apps/portal/src/`: `atoms/`, `molecules/`, `organisms/`, `templates/`, `pages/`.
+- Los átomos de formulario, botón, diálogo, tabla, etc. son de shadcn/ui con Radix en `apps/portal/src/components/ui/` (añadir con `npx shadcn@latest add`, desde `apps/portal`); los tokens y reglas están en `docs/design/SISTEMA.md`. Los átomos propios, moléculas, organismos y templates de las pantallas nuevas viven en `src/design/`.
+- Las pantallas de lista (alineación con la barra lateral, totales arriba, filas ajustadas, pie) siguen «Pantallas de lista» de `docs/design/SISTEMA.md`; Cobros es la referencia.
 - Átomos: elementos primitivos (`input`, `label`, `span`, `div`, `button`). Sin lógica ni estado de negocio.
 - Moléculas: 2 o 3 átomos (no es regla dura) con un solo propósito. Ej.: `FormField` = `label` + `input` + mensaje de error.
 - Organismos: formularios, tarjetas, tablas. Pueden contener otros organismos y gestionar estado interno (ej. React Hook Form para el estado del formulario).
