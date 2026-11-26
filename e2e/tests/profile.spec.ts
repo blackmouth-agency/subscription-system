@@ -127,7 +127,7 @@ test("al cambiar mi contraseña con la actual y una nueva veo que se cambió y l
   await expect(page.getByText("Correo o contraseña incorrectos.")).toBeVisible();
   await page.getByLabel("Contraseña").fill("clave-nueva-456");
   await page.getByRole("button", { name: "Iniciar sesión" }).click();
-  await expect(page.getByText(`Entraste como ${email}`)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Cerrar sesión" })).toBeVisible();
 });
 
 test("con mi contraseña actual equivocada veo que no es correcta y la contraseña no cambia", async ({ page }) => {
@@ -141,7 +141,7 @@ test("con mi contraseña actual equivocada veo que no es correcta y la contrase�
   await expect(page.getByText("Correo o contraseña incorrectos.")).toBeVisible();
   await page.getByLabel("Contraseña").fill(password);
   await page.getByRole("button", { name: "Iniciar sesión" }).click();
-  await expect(page.getByText(`Entraste como ${email}`)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Cerrar sesión" })).toBeVisible();
 });
 
 test("no puedo cambiar mi contraseña por una de menos de 8 caracteres", async ({ page }) => {
@@ -152,7 +152,7 @@ test("no puedo cambiar mi contraseña por una de menos de 8 caracteres", async (
 
   await expect(page.getByText("La contraseña debe tener al menos 8 caracteres.")).toBeVisible();
   await signOutAndSignIn(page, email, password);
-  await expect(page.getByText(`Entraste como ${email}`)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Cerrar sesión" })).toBeVisible();
 });
 
 // Pide eliminar la cuenta escribiendo ese correo para confirmar.
@@ -192,5 +192,5 @@ test("si escribo un correo distinto al mío mi cuenta no se elimina", async ({ p
 
   await expect(page.getByText("El correo no coincide con el tuyo.")).toBeVisible();
   await signOutAndSignIn(page, email, password);
-  await expect(page.getByText(`Entraste como ${email}`)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Cerrar sesión" })).toBeVisible();
 });

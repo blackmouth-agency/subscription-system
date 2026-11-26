@@ -41,7 +41,7 @@ test("al iniciar sesión veo con qué correo entré", async ({ page }) => {
 
   await signIn(page, email, password);
 
-  await expect(page.getByText(`Entraste como ${email}`)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Cerrar sesión" })).toBeVisible();
 });
 
 test("con una contraseña equivocada veo que el correo o la contraseña no son correctos", async ({ page }) => {
@@ -59,12 +59,12 @@ test("al cerrar sesión vuelvo al formulario de inicio", async ({ page }) => {
   await admin.auth.admin.createUser({ email, password, email_confirm: true });
 
   await signIn(page, email, password);
-  await expect(page.getByText(`Entraste como ${email}`)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Cerrar sesión" })).toBeVisible();
 
   await page.getByRole("button", { name: "Cerrar sesión" }).click();
 
   await expect(page.getByRole("button", { name: "Iniciar sesión" })).toBeVisible();
-  await expect(page.getByText(`Entraste como ${email}`)).toBeHidden();
+  await expect(page.getByRole("button", { name: "Cerrar sesión" })).toBeHidden();
 });
 
 test("después de cerrar sesión, al volver a abrir el portal me pide iniciar sesión", async ({ page }) => {
@@ -73,14 +73,14 @@ test("después de cerrar sesión, al volver a abrir el portal me pide iniciar se
   await admin.auth.admin.createUser({ email, password, email_confirm: true });
 
   await signIn(page, email, password);
-  await expect(page.getByText(`Entraste como ${email}`)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Cerrar sesión" })).toBeVisible();
   await page.getByRole("button", { name: "Cerrar sesión" }).click();
   await expect(page.getByRole("button", { name: "Iniciar sesión" })).toBeVisible();
 
   const reopened = await reopenPortal(page);
 
   await expect(reopened.getByRole("button", { name: "Iniciar sesión" })).toBeVisible();
-  await expect(reopened.getByText(`Entraste como ${email}`)).toBeHidden();
+  await expect(reopened.getByRole("button", { name: "Cerrar sesión" })).toBeHidden();
 });
 
 test("después de entrar, al volver a abrir el portal sigo dentro sin poner la contraseña", async ({ page }) => {
@@ -89,11 +89,11 @@ test("después de entrar, al volver a abrir el portal sigo dentro sin poner la c
   await admin.auth.admin.createUser({ email, password, email_confirm: true });
 
   await signIn(page, email, password);
-  await expect(page.getByText(`Entraste como ${email}`)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Cerrar sesión" })).toBeVisible();
 
   const reopened = await reopenPortal(page);
 
-  await expect(reopened.getByText(`Entraste como ${email}`)).toBeVisible();
+  await expect(reopened.getByRole("button", { name: "Cerrar sesión" })).toBeVisible();
   await expect(reopened.getByRole("button", { name: "Iniciar sesión" })).toBeHidden();
 });
 
@@ -111,7 +111,7 @@ test('con la contraseña equivocada sigo en el formulario para corregirla y no v
   await page.getByLabel("Contraseña").fill(password);
   await page.getByRole("button", { name: "Iniciar sesión" }).click();
 
-  await expect(page.getByText(`Entraste como ${email}`)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Cerrar sesión" })).toBeVisible();
 });
 
 test("al volver a abrir el portal con la sesión guardada no aparece el formulario ni por un instante", async ({
@@ -123,7 +123,7 @@ test("al volver a abrir el portal con la sesión guardada no aparece el formular
   await admin.auth.admin.createUser({ email, password, email_confirm: true });
 
   await signIn(page, email, password);
-  await expect(page.getByText(`Entraste como ${email}`)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Cerrar sesión" })).toBeVisible();
 
   // Anota si algún formulario llega a estar en la página, aunque desaparezca enseguida.
   await context.addInitScript(() => {
@@ -135,7 +135,7 @@ test("al volver a abrir el portal con la sesión guardada no aparece el formular
   });
   const reopened = await reopenPortal(page);
 
-  await expect(reopened.getByText(`Entraste como ${email}`)).toBeVisible();
+  await expect(reopened.getByRole("button", { name: "Cerrar sesión" })).toBeVisible();
   expect(await reopened.evaluate(() => (window as unknown as { formAppeared: boolean }).formAppeared)).toBe(false);
 });
 
@@ -154,7 +154,7 @@ test("mientras inicio sesión no puedo volver a enviar el formulario", async ({ 
 
   await expect(page.getByRole("button", { name: "Iniciar sesión" })).toBeDisabled();
   release();
-  await expect(page.getByText(`Entraste como ${email}`)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Cerrar sesión" })).toBeVisible();
 });
 
 test("al registrarme con mi correo y una contraseña veo que debo revisar mi correo", async ({ page }) => {
@@ -284,7 +284,7 @@ test("al abrir el enlace de confirmación entro al portal con mi cuenta", async 
 
   await page.goto(await confirmationLink(email));
 
-  await expect(page.getByText(`Entraste como ${email}`)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Cerrar sesión" })).toBeVisible();
 });
 
 // Abre el portal y pide el enlace para recuperar la contraseña de ese correo.
@@ -320,11 +320,11 @@ test("al abrir el enlace de recuperación y guardar una contraseña nueva entro 
   await openPasswordResetLink(page, email);
 
   await expect(page.getByLabel("Contraseña nueva")).toBeVisible();
-  await expect(page.getByText(`Entraste como ${email}`)).toBeHidden();
+  await expect(page.getByRole("button", { name: "Cerrar sesión" })).toBeHidden();
   await page.getByLabel("Contraseña nueva").fill("clave-nueva-456");
   await page.getByRole("button", { name: "Guardar contraseña" }).click();
 
-  await expect(page.getByText(`Entraste como ${email}`)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Cerrar sesión" })).toBeVisible();
 });
 
 test("después de recuperarla, la contraseña anterior ya no sirve y la nueva sí", async ({ page }) => {
@@ -333,7 +333,7 @@ test("después de recuperarla, la contraseña anterior ya no sirve y la nueva s�
   await openPasswordResetLink(page, email);
   await page.getByLabel("Contraseña nueva").fill("clave-nueva-456");
   await page.getByRole("button", { name: "Guardar contraseña" }).click();
-  await expect(page.getByText(`Entraste como ${email}`)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Cerrar sesión" })).toBeVisible();
   await page.getByRole("button", { name: "Cerrar sesión" }).click();
   await expect(page.getByRole("button", { name: "Iniciar sesión" })).toBeVisible();
 
@@ -342,7 +342,7 @@ test("después de recuperarla, la contraseña anterior ya no sirve y la nueva s�
 
   await page.getByLabel("Contraseña").fill("clave-nueva-456");
   await page.getByRole("button", { name: "Iniciar sesión" }).click();
-  await expect(page.getByText(`Entraste como ${email}`)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Cerrar sesión" })).toBeVisible();
 });
 
 test("con el enlace de recuperación no puedo guardar una contraseña de menos de 8 caracteres", async ({ page }) => {
@@ -355,7 +355,7 @@ test("con el enlace de recuperación no puedo guardar una contraseña de menos d
 
   await expect(page.getByText("La contraseña debe tener al menos 8 caracteres.")).toBeVisible();
   await expect(page.getByLabel("Contraseña nueva")).toBeVisible();
-  await expect(page.getByText(`Entraste como ${email}`)).toBeHidden();
+  await expect(page.getByRole("button", { name: "Cerrar sesión" })).toBeHidden();
 });
 
 test("al abrir un enlace de recuperación que ya usé veo que debo pedir uno nuevo", async ({ page }) => {
@@ -364,7 +364,7 @@ test("al abrir un enlace de recuperación que ya usé veo que debo pedir uno nue
   const link = await openPasswordResetLink(page, email);
   await page.getByLabel("Contraseña nueva").fill("clave-nueva-456");
   await page.getByRole("button", { name: "Guardar contraseña" }).click();
-  await expect(page.getByText(`Entraste como ${email}`)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Cerrar sesión" })).toBeVisible();
   await page.getByRole("button", { name: "Cerrar sesión" }).click();
   await expect(page.getByRole("button", { name: "Iniciar sesión" })).toBeVisible();
 

@@ -5,7 +5,7 @@ test("un admin ve el área de administración", async ({ page }) => {
   await signInAt(page, await createUser(true));
 
   await expect(
-    page.getByRole("heading", { name: "Administración" }),
+    page.getByRole("region", { name: "Administración" }),
   ).toBeVisible();
   await expect(page.getByText("Sin acceso")).toHaveCount(0);
 });
@@ -17,7 +17,7 @@ test("una cuenta sin el rol ve sin acceso y conserva perfil y cerrar sesión", a
 
   await expect(page.getByText("Sin acceso")).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Administración" }),
+    page.getByRole("region", { name: "Administración" }),
   ).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Mi perfil" })).toBeVisible();
   await expect(
