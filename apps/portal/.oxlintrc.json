@@ -2,6 +2,12 @@
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": ["react", "typescript", "oxc"],
   "jsPlugins": ["@stylistic/eslint-plugin"],
+  "overrides": [
+    {
+      "files": ["src/components/ui/**"],
+      "rules": { "@stylistic/max-len": "off" }
+    }
+  ],
   "rules": {
     "@stylistic/max-len": ["error", { "code": 80 }],
     "react/rules-of-hooks": "error",

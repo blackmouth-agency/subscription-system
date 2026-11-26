@@ -5,3 +5,12 @@ node_modules/
 .wrangler/
 test-results/
 playwright-report/
+
+# Material de trabajo local
+docs/design/referencias/
+docs/design/PROMPT.md
+docs/design/BRIEF.md
+docs/design/LINKS.md
+docs/design/DATOS.md
+supabase/snippets/
+.claude/settings.json
