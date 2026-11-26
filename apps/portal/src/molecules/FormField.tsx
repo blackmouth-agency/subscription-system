@@ -17,7 +17,7 @@ export default function FormField({
   ...props
 }: Props) {
   return (
-    <>
+    <div className="campo">
       <label htmlFor={id}>{label}</label>
       {multiline ? (
         <textarea id={id} {...(props as ComponentProps<"textarea">)} />
@@ -25,6 +25,6 @@ export default function FormField({
         <input id={id} {...props} />
       )}
       <span role="alert">{error}</span>
-    </>
+    </div>
   );
 }

@@ -22,7 +22,7 @@ export default function SelectField({
   ...props
 }: Props) {
   return (
-    <>
+    <div className="campo">
       <label htmlFor={id}>{label}</label>
       <select id={id} {...props}>
         {placeholder !== undefined && <option value="">{placeholder}</option>}
@@ -33,6 +33,6 @@ export default function SelectField({
         ))}
       </select>
       <span role="alert">{error}</span>
-    </>
+    </div>
   );
 }

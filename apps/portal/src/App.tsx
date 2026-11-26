@@ -279,8 +279,13 @@ export default function App() {
   }
 
   return (
-    <main>
-      <h1>Portal de BlackMouth</h1>
+    <main className={session && !recovering ? "contenido" : "sala"}>
+      {!(session && !recovering && isAdmin === true) && (
+        <h1>
+          <img src="/logo.png" alt="" />
+          BlackMouth
+        </h1>
+      )}
       {session === null && mode === "signin" && (
         <>
           <form method="post" onSubmit={(event) => submit(event, signInWith)}>
@@ -289,10 +294,18 @@ export default function App() {
               Iniciar sesión
             </button>
           </form>
-          <button type="button" onClick={() => setMode("forgot")}>
+          <button
+            type="button"
+            className="enlace"
+            onClick={() => setMode("forgot")}
+          >
             ¿Olvidaste tu contraseña?
           </button>
-          <button type="button" onClick={() => setMode("signup")}>
+          <button
+            type="button"
+            className="enlace"
+            onClick={() => setMode("signup")}
+          >
             Crear una cuenta
           </button>
         </>
@@ -348,7 +361,11 @@ export default function App() {
               Crear cuenta
             </button>
           </form>
-          <button type="button" onClick={() => setMode("signin")}>
+          <button
+            type="button"
+            className="enlace"
+            onClick={() => setMode("signin")}
+          >
             Ya tengo cuenta
           </button>
         </>
@@ -380,13 +397,13 @@ export default function App() {
           <button type="submit">Guardar contraseña</button>
         </form>
       )}
-      <p role="status">
-        {session && !recovering
-          ? `Entraste como ${session.user.email}`
-          : message}
-      </p>
+      <p role="status">{session && !recovering ? "" : message}</p>
       {session && !recovering && isAdmin === true && (
-        <AdminTemplate>
+        <AdminTemplate
+          email={session.user.email!}
+          onProfile={() => setShowProfile(true)}
+          onSignOut={() => supabase.auth.signOut()}
+        >
           {window.location.pathname === "/admin/products" && (
             <ProductsPage accessToken={session.access_token} />
           )}
@@ -413,12 +430,16 @@ export default function App() {
       {session && !recovering && isAdmin === false && <p>Sin acceso</p>}
       {session && !recovering && (
         <>
-          <button type="button" onClick={() => setShowProfile(true)}>
-            Mi perfil
-          </button>
-          <button type="button" onClick={() => supabase.auth.signOut()}>
-            Cerrar sesión
-          </button>
+          {isAdmin !== true && (
+            <>
+              <button type="button" onClick={() => setShowProfile(true)}>
+                Mi perfil
+              </button>
+              <button type="button" onClick={() => supabase.auth.signOut()}>
+                Cerrar sesión
+              </button>
+            </>
+          )}
         </>
       )}
       {session && !recovering && showProfile && (
